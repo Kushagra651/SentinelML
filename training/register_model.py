@@ -116,7 +116,7 @@ def _load_registry() -> dict:
     if not REGISTRY_FILE.exists():
         logger.info("No existing registry found — starting fresh")
         return {"models": {}, "production_version": None}
-    
+
     with open(REGISTRY_FILE) as f:
         registry = json.load(f)
 
@@ -577,9 +577,7 @@ def rollback(target_version_tag: str) -> dict:
 
     # Restore target version as production
     registry["models"][target_version_tag]["status"] = "production"
-    registry["models"][target_version_tag][
-        "restored_at"
-    ] = datetime.now().isoformat()
+    registry["models"][target_version_tag]["restored_at"] = datetime.now().isoformat()
     registry["production_version"] = target_version_tag
     registry["last_promoted_at"] = datetime.now().isoformat()
 
