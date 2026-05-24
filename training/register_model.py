@@ -116,7 +116,7 @@ def _load_registry() -> dict:
     if not REGISTRY_FILE.exists():
         logger.info("No existing registry found — starting fresh")
         return {"models": {}, "production_version": None}
-
+    
     with open(REGISTRY_FILE) as f:
         registry = json.load(f)
 
@@ -313,7 +313,7 @@ def _write_audit_entry(
     Format per line:
       2024-04-15T14:30:22Z | PROMOTED  | v20240415_143022 | roc_auc=0.8821 | reason: ...
     """
-    timestamp = datetime.utcnow().strftime("%Y-%m-%dT%H:%M:%SZ")
+    timestamp = datetime.now().strftime("%Y-%m-%dT%H:%M:%SZ")
 
     metrics_str = ""
     if metrics:
@@ -475,7 +475,7 @@ def register_model(version_tag: str, force: bool = False) -> dict:
 
     # Update the pointer to which version is production
     registry["production_version"] = version_tag
-    registry["last_promoted_at"] = datetime.utcnow().isoformat()
+    registry["last_promoted_at"] = datetime.now().isoformat()
 
     # -------------------------------------------------------------------------
     # STEP 5 — Persist everything
@@ -485,7 +485,7 @@ def register_model(version_tag: str, force: bool = False) -> dict:
     # Write production_model.json — predict.py reads this on startup
     production_info = {
         "version_tag": version_tag,
-        "promoted_at": datetime.utcnow().isoformat(),
+        "promoted_at": datetime.now().isoformat(),
         "model_path": str(MODEL_DIR / f"model_v{version_tag}.pkl"),
         "pipeline_path": str(MODEL_DIR / f"pipeline_v{version_tag}.pkl"),
         "metrics": new_metrics,
@@ -579,15 +579,15 @@ def rollback(target_version_tag: str) -> dict:
     registry["models"][target_version_tag]["status"] = "production"
     registry["models"][target_version_tag][
         "restored_at"
-    ] = datetime.utcnow().isoformat()
+    ] = datetime.now().isoformat()
     registry["production_version"] = target_version_tag
-    registry["last_promoted_at"] = datetime.utcnow().isoformat()
+    registry["last_promoted_at"] = datetime.now().isoformat()
 
     # Update production_model.json
     target_metrics = target_entry.get("metrics", {})
     production_info = {
         "version_tag": target_version_tag,
-        "promoted_at": datetime.utcnow().isoformat(),
+        "promoted_at": datetime.now().isoformat(),
         "model_path": str(model_path),
         "pipeline_path": str(pipeline_path),
         "metrics": target_metrics,
@@ -648,7 +648,7 @@ def _record_in_registry(
     registry["models"][version_tag] = {
         "version_tag": version_tag,
         "status": status,
-        "recorded_at": datetime.utcnow().isoformat(),
+        "recorded_at": datetime.now().isoformat(),
         "reason": reason,
         "metrics": eval_report.get("metrics", {}),
         "promote_flag": eval_report.get("promote"),

@@ -1,0 +1,26 @@
+# ── railway.toml ─────────────────────────────────────────────────────────────
+# Railway reads this file to build and run the FastAPI service.
+# Only FastAPI + Postgres are deployed to Railway — Airflow, Prometheus,
+# Grafana, cAdvisor, and Node Exporter run in Codespaces/local only.
+# ─────────────────────────────────────────────────────────────────────────────
+
+[build]
+# Use our multi-stage Dockerfile instead of Railway's auto-detect
+dockerfilePath = "dockerfiles/Dockerfile.api"
+
+[deploy]
+# Override the Dockerfile CMD for Railway:
+# - Only starts uvicorn (no prometheus_exporter — that runs in Codespaces)
+# - $PORT is injected automatically by Railway at runtime
+startCommand = "uvicorn api.main:app --host 0.0.0.0 --port $PORT --workers 2 --log-level info --access-log"
+
+# Restart policy
+restartPolicyType = "on_failure"
+restartPolicyMaxRetries = 5
+
+# Free tier: single instance only
+numReplicas = 1
+
+# Railway polls this endpoint to confirm the service is alive
+healthcheckPath = "/health"
+healthcheckTimeout = 30
