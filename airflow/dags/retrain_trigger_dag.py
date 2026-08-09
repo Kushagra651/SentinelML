@@ -109,7 +109,11 @@ def task_poll_signal(**ctx):
             val = Variable.get(RETRAIN_VAR_KEY, default_var="false")
             should_retrain = val.lower() == "true"
         except Exception as e:
-            log.error("Could not read %s Variable: %s. Defaulting to false.", RETRAIN_VAR_KEY, e)
+            log.error(
+                "Could not read %s Variable: %s. Defaulting to false.",
+                RETRAIN_VAR_KEY,
+                e,
+            )
             should_retrain = False
         signal = {"should_retrain": should_retrain, "source": "drift_check_variable"}
 
@@ -200,7 +204,8 @@ def task_update_cooldown(**ctx):
     _write_cooldown(state)
     log.info(
         "Cooldown updated: last=%s  runs_today=%d",
-        now.isoformat(), state["runs_today"],
+        now.isoformat(),
+        state["runs_today"],
     )
 
 
@@ -254,7 +259,9 @@ with DAG(
 ) as dag:
 
     t_poll = PythonOperator(task_id="poll_signal", python_callable=task_poll_signal)
-    t_cooldown = PythonOperator(task_id="check_cooldown", python_callable=task_check_cooldown)
+    t_cooldown = PythonOperator(
+        task_id="check_cooldown", python_callable=task_check_cooldown
+    )
     t_branch = BranchPythonOperator(task_id="branch", python_callable=task_branch)
 
     t_trigger = TriggerDagRunOperator(
@@ -262,12 +269,21 @@ with DAG(
         trigger_dag_id=TRAINING_DAG_ID,
         wait_for_completion=False,
         reset_dag_run=False,
-        conf={"triggered_by": "ml_retrain_trigger", "reason": "drift_or_quality_failure"},
+        conf={
+            "triggered_by": "ml_retrain_trigger",
+            "reason": "drift_or_quality_failure",
+        },
     )
 
-    t_notify = PythonOperator(task_id="notify_triggered", python_callable=task_notify_triggered)
-    t_update_cd = PythonOperator(task_id="update_cooldown", python_callable=task_update_cooldown)
-    t_clear = PythonOperator(task_id="clear_force_var", python_callable=task_clear_force_var)
+    t_notify = PythonOperator(
+        task_id="notify_triggered", python_callable=task_notify_triggered
+    )
+    t_update_cd = PythonOperator(
+        task_id="update_cooldown", python_callable=task_update_cooldown
+    )
+    t_clear = PythonOperator(
+        task_id="clear_force_var", python_callable=task_clear_force_var
+    )
     t_skip = PythonOperator(task_id="skip_retrain", python_callable=task_skip_retrain)
 
     t_done = EmptyOperator(

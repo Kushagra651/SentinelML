@@ -446,10 +446,14 @@ if __name__ == "__main__":
         bundle = _ensure_loaded()
         logger.info("Bundle loaded: version=%s alias=%s", bundle.version, bundle.alias)
         logger.info("reload_if_stale() → %s", reload_if_stale())
-        logger.info("Model info: %s", json.dumps(get_model_info(), indent=2, default=str))
+        logger.info(
+            "Model info: %s", json.dumps(get_model_info(), indent=2, default=str)
+        )
         logger.info("predict.py self-test passed.")
         sys.exit(0)
     except FileNotFoundError as exc:
         logger.warning("Artifacts not present yet (expected during dev): %s", exc)
-        logger.info("Import structure OK — run training pipeline to generate artifacts.")
+        logger.info(
+            "Import structure OK — run training pipeline to generate artifacts."
+        )
         sys.exit(0)

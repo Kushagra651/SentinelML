@@ -261,7 +261,10 @@ def _is_better_than_production(
 
     logger.info(
         "Comparison — new ROC-AUC: %.4f  prod ROC-AUC: %.4f  delta: %+.4f  (min: %+.4f)",
-        new_auc, prod_auc, delta, MIN_IMPROVEMENT_DELTA,
+        new_auc,
+        prod_auc,
+        delta,
+        MIN_IMPROVEMENT_DELTA,
     )
 
     if delta >= MIN_IMPROVEMENT_DELTA:
@@ -330,10 +333,17 @@ def register_model(version_tag: str, force: bool = False) -> dict:
         _record_in_registry(registry, version_tag, "failed", eval_report, reason)
         _save_registry(registry)
         _write_audit_entry("REJECTED", version_tag, reason, new_metrics)
-        return {"promoted": False, "version_tag": version_tag, "reason": reason, "metrics": new_metrics}
+        return {
+            "promoted": False,
+            "version_tag": version_tag,
+            "reason": reason,
+            "metrics": new_metrics,
+        }
 
     if force and not eval_promote:
-        logger.warning("⚠️  force=True — bypassing promotion gate (model did NOT pass thresholds)")
+        logger.warning(
+            "⚠️  force=True — bypassing promotion gate (model did NOT pass thresholds)"
+        )
 
     # ── Step 3: Compare against current production ────────────────────────────
     registry = _load_registry()
@@ -352,7 +362,12 @@ def register_model(version_tag: str, force: bool = False) -> dict:
         _record_in_registry(registry, version_tag, "not_promoted", eval_report, reason)
         _save_registry(registry)
         _write_audit_entry("NOT_PROMOTED", version_tag, reason, new_metrics)
-        return {"promoted": False, "version_tag": version_tag, "reason": reason, "metrics": new_metrics}
+        return {
+            "promoted": False,
+            "version_tag": version_tag,
+            "reason": reason,
+            "metrics": new_metrics,
+        }
 
     # ── Step 5: Promote ───────────────────────────────────────────────────────
     logger.info("✅  Promoting v%s to production …", version_tag)
@@ -381,7 +396,12 @@ def register_model(version_tag: str, force: bool = False) -> dict:
     )
     logger.info("=" * 60)
 
-    return {"promoted": True, "version_tag": version_tag, "reason": reason, "metrics": new_metrics}
+    return {
+        "promoted": True,
+        "version_tag": version_tag,
+        "reason": reason,
+        "metrics": new_metrics,
+    }
 
 
 def rollback(target_version_tag: str) -> dict:
@@ -418,7 +438,9 @@ def rollback(target_version_tag: str) -> dict:
     if not model_path.exists():
         raise FileNotFoundError(f"Model artifact missing for rollback: {model_path}")
     if not pipeline_path.exists():
-        raise FileNotFoundError(f"Pipeline artifact missing for rollback: {pipeline_path}")
+        raise FileNotFoundError(
+            f"Pipeline artifact missing for rollback: {pipeline_path}"
+        )
 
     # Load the eval report for this version to reconstruct production_model.json correctly
     eval_report = _load_eval_report(target_version_tag)
@@ -431,7 +453,9 @@ def rollback(target_version_tag: str) -> dict:
 
     # Update registry
     registry["models"][target_version_tag]["status"] = "production"
-    registry["models"][target_version_tag]["restored_at"] = datetime.utcnow().isoformat()
+    registry["models"][target_version_tag][
+        "restored_at"
+    ] = datetime.utcnow().isoformat()
     registry["production_version"] = target_version_tag
     registry["last_promoted_at"] = datetime.utcnow().isoformat()
     _save_registry(registry)
@@ -481,13 +505,20 @@ def list_models(status_filter: Optional[str] = None) -> list:
 if __name__ == "__main__":
     import argparse
 
-    parser = argparse.ArgumentParser(description="Register or rollback ML model versions.")
-    parser.add_argument("--action", type=str, default="promote",
-                        choices=["promote", "rollback", "list"])
+    parser = argparse.ArgumentParser(
+        description="Register or rollback ML model versions."
+    )
+    parser.add_argument(
+        "--action", type=str, default="promote", choices=["promote", "rollback", "list"]
+    )
     parser.add_argument("--version_tag", type=str, default=None)
     parser.add_argument("--force", action="store_true")
-    parser.add_argument("--status", type=str, default=None,
-                        choices=["production", "archived", "failed", "not_promoted"])
+    parser.add_argument(
+        "--status",
+        type=str,
+        default=None,
+        choices=["production", "archived", "failed", "not_promoted"],
+    )
     args = parser.parse_args()
 
     if args.action == "promote":
@@ -499,8 +530,10 @@ if __name__ == "__main__":
         print(f"  Reason   : {result['reason']}")
         if result.get("metrics"):
             m = result["metrics"]
-            print(f"  Metrics  : acc={m.get('accuracy', 0):.4f}  "
-                  f"f1={m.get('f1', 0):.4f}  roc_auc={m.get('roc_auc', 0):.4f}")
+            print(
+                f"  Metrics  : acc={m.get('accuracy', 0):.4f}  "
+                f"f1={m.get('f1', 0):.4f}  roc_auc={m.get('roc_auc', 0):.4f}"
+            )
 
     elif args.action == "rollback":
         if not args.version_tag:
@@ -510,7 +543,9 @@ if __name__ == "__main__":
 
     elif args.action == "list":
         models = list_models(status_filter=args.status)
-        print(f"\n{'VERSION TAG':<22} {'STATUS':<15} {'ROC-AUC':<10} {'F1':<10} RECORDED AT")
+        print(
+            f"\n{'VERSION TAG':<22} {'STATUS':<15} {'ROC-AUC':<10} {'F1':<10} RECORDED AT"
+        )
         print("-" * 80)
         for m in models:
             metrics = m.get("metrics", {})
@@ -518,5 +553,7 @@ if __name__ == "__main__":
             f1 = metrics.get("f1", "n/a")
             roc_str = f"{roc:.4f}" if isinstance(roc, float) else roc
             f1_str = f"{f1:.4f}" if isinstance(f1, float) else f1
-            print(f"{m['version_tag']:<22} {m.get('status', 'unknown'):<15} "
-                  f"{roc_str:<10} {f1_str:<10} {m.get('recorded_at', '')}")
+            print(
+                f"{m['version_tag']:<22} {m.get('status', 'unknown'):<15} "
+                f"{roc_str:<10} {f1_str:<10} {m.get('recorded_at', '')}"
+            )

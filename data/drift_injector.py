@@ -153,7 +153,9 @@ def inject_covariate_drift(
 
         logger.debug(
             "Covariate drift injected into '%s' | shift=%.4f | gradual=%s",
-            col, shift, gradual,
+            col,
+            shift,
+            gradual,
         )
 
     return df
@@ -199,7 +201,9 @@ def inject_label_drift(
             labels.loc[flip_idx] = pos_label
         elif delta < 0:
             pos_idx = labels[labels == pos_label].index.tolist()
-            flip_idx = rng.choice(pos_idx, size=min(-delta, len(pos_idx)), replace=False)
+            flip_idx = rng.choice(
+                pos_idx, size=min(-delta, len(pos_idx)), replace=False
+            )
             labels.loc[flip_idx] = neg_label
     else:
         n_flip = max(1, int(n * intensity))
@@ -366,7 +370,9 @@ def inject_categorical_drift(
         df.iloc[idx, df.columns.get_loc(col)] = chosen_labels
         logger.debug(
             "Categorical drift: %d rows in '%s' set to unseen labels %s.",
-            n_affected, col, new_labels,
+            n_affected,
+            col,
+            new_labels,
         )
 
     return df
@@ -427,7 +433,10 @@ def inject_drift(df: pd.DataFrame, config: DriftConfig) -> pd.DataFrame:
     """
     logger.info(
         "Injecting drift | type=%s | intensity=%.2f | gradual=%s | seed=%d",
-        config.drift_type, config.intensity, config.gradual, config.seed,
+        config.drift_type,
+        config.intensity,
+        config.gradual,
+        config.seed,
     )
 
     kwargs: dict[str, Any] = dict(

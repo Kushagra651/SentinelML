@@ -48,10 +48,19 @@ CONFIDENCE_LOW_WARN = float(os.getenv("CONFIDENCE_LOW_WARN", "0.55"))
 
 # Log record columns to exclude when auto-detecting feature columns
 _LOG_META_COLS = {
-    "request_id", "prediction", "confidence", "model_version",
-    "model_alias", "timestamp", "ground_truth", "warnings",
-    "schema_version", "latency_ms", "probability_class_0",
-    "probability_class_1", "features",
+    "request_id",
+    "prediction",
+    "confidence",
+    "model_version",
+    "model_alias",
+    "timestamp",
+    "ground_truth",
+    "warnings",
+    "schema_version",
+    "latency_ms",
+    "probability_class_0",
+    "probability_class_1",
+    "features",
 }
 
 
@@ -61,7 +70,7 @@ _LOG_META_COLS = {
 @dataclass
 class CheckResult:
     check_name: str
-    severity: str   # "hard" | "soft"
+    severity: str  # "hard" | "soft"
     passed: bool
     message: str
     details: Dict[str, Any] = field(default_factory=dict)
@@ -72,9 +81,9 @@ class FeatureQuality:
     feature: str
     missing_pct: float
     missing_count: int
-    oor_pct: Optional[float]         # numerical only
+    oor_pct: Optional[float]  # numerical only
     oor_count: Optional[int]
-    unknown_cat_pct: Optional[float] # categorical only
+    unknown_cat_pct: Optional[float]  # categorical only
     unknown_cat_count: Optional[int]
     quality_ok: bool
 
@@ -119,9 +128,7 @@ def _check_schema(df: pd.DataFrame, expected_columns: List[str]) -> CheckResult:
         severity="hard",
         passed=passed,
         message=(
-            "All expected columns present."
-            if passed
-            else f"Missing columns: {missing}"
+            "All expected columns present." if passed else f"Missing columns: {missing}"
         ),
         details={"missing_columns": missing},
     )
@@ -163,7 +170,10 @@ def _check_confidence(df: pd.DataFrame) -> CheckResult:
             if passed
             else f"Low mean confidence {mean_conf:.3f} < threshold {CONFIDENCE_LOW_WARN}."
         ),
-        details={"mean_confidence": round(mean_conf, 4), "threshold": CONFIDENCE_LOW_WARN},
+        details={
+            "mean_confidence": round(mean_conf, 4),
+            "threshold": CONFIDENCE_LOW_WARN,
+        },
     )
 
 
@@ -251,27 +261,31 @@ def _missing_rate_checks(
             continue
         rate = float(df[feat].isna().mean())
         if rate >= MISSING_CRITICAL_PCT:
-            results.append(CheckResult(
-                check_name=f"missing_rate_{feat}",
-                severity="hard",
-                passed=False,
-                message=(
-                    f"Feature '{feat}' missing rate {rate:.1%} ≥ "
-                    f"critical threshold {MISSING_CRITICAL_PCT:.1%}."
-                ),
-                details={"feature": feat, "missing_pct": round(rate, 4)},
-            ))
+            results.append(
+                CheckResult(
+                    check_name=f"missing_rate_{feat}",
+                    severity="hard",
+                    passed=False,
+                    message=(
+                        f"Feature '{feat}' missing rate {rate:.1%} ≥ "
+                        f"critical threshold {MISSING_CRITICAL_PCT:.1%}."
+                    ),
+                    details={"feature": feat, "missing_pct": round(rate, 4)},
+                )
+            )
         elif rate >= MISSING_WARN_PCT:
-            results.append(CheckResult(
-                check_name=f"missing_rate_{feat}",
-                severity="soft",
-                passed=False,
-                message=(
-                    f"Feature '{feat}' missing rate {rate:.1%} ≥ "
-                    f"warning threshold {MISSING_WARN_PCT:.1%}."
-                ),
-                details={"feature": feat, "missing_pct": round(rate, 4)},
-            ))
+            results.append(
+                CheckResult(
+                    check_name=f"missing_rate_{feat}",
+                    severity="soft",
+                    passed=False,
+                    message=(
+                        f"Feature '{feat}' missing rate {rate:.1%} ≥ "
+                        f"warning threshold {MISSING_WARN_PCT:.1%}."
+                    ),
+                    details={"feature": feat, "missing_pct": round(rate, 4)},
+                )
+            )
     return results
 
 
@@ -328,13 +342,19 @@ def compute_quality_report(
         known_cats = (known_categories or {}).get(feat)
         try:
             feature_quality.append(
-                _feature_quality(log_df, feat, ref_stats=ref_stats, known_categories=known_cats)
+                _feature_quality(
+                    log_df, feat, ref_stats=ref_stats, known_categories=known_cats
+                )
             )
         except Exception as e:
             log.error("FeatureQuality failed for '%s': %s", feat, e)
 
-    hard_failures = [c.check_name for c in checks if not c.passed and c.severity == "hard"]
-    soft_warnings = [c.check_name for c in checks if not c.passed and c.severity == "soft"]
+    hard_failures = [
+        c.check_name for c in checks if not c.passed and c.severity == "hard"
+    ]
+    soft_warnings = [
+        c.check_name for c in checks if not c.passed and c.severity == "soft"
+    ]
     overall_passed = len(hard_failures) == 0
 
     summary = {
@@ -366,7 +386,10 @@ def compute_quality_report(
 
     log.info(
         "Quality report %s | passed=%s | hard=%d soft=%d",
-        report_id, overall_passed, len(hard_failures), len(soft_warnings),
+        report_id,
+        overall_passed,
+        len(hard_failures),
+        len(soft_warnings),
     )
     return report
 

@@ -47,12 +47,22 @@ PSI_BINS = int(os.getenv("PSI_BINS", "10"))
 
 # UCI Adult Income — 6 numerical, 8 categorical
 NUMERICAL_FEATURES = [
-    "age", "fnlwgt", "education_num",
-    "capital_gain", "capital_loss", "hours_per_week",
+    "age",
+    "fnlwgt",
+    "education_num",
+    "capital_gain",
+    "capital_loss",
+    "hours_per_week",
 ]
 CATEGORICAL_FEATURES = [
-    "workclass", "education", "marital_status", "occupation",
-    "relationship", "race", "sex", "native_country",
+    "workclass",
+    "education",
+    "marital_status",
+    "occupation",
+    "relationship",
+    "race",
+    "sex",
+    "native_country",
 ]
 
 
@@ -62,13 +72,13 @@ CATEGORICAL_FEATURES = [
 @dataclass
 class FeatureDriftResult:
     feature: str
-    dtype: str          # "numerical" | "categorical"
-    method: str         # "ks" | "chi2"
+    dtype: str  # "numerical" | "categorical"
+    method: str  # "ks" | "chi2"
     statistic: float
     p_value: float
     psi: Optional[float]
     drifted: bool
-    severity: str       # "none" | "warning" | "critical"
+    severity: str  # "none" | "warning" | "critical"
     ref_mean: Optional[float] = None
     cur_mean: Optional[float] = None
     ref_std: Optional[float] = None
@@ -202,8 +212,14 @@ def _drift_categorical(
 
     if ref_counts.sum() == 0 or cur_counts.sum() == 0:
         return FeatureDriftResult(
-            feature=feature, dtype="categorical", method="chi2",
-            statistic=0.0, p_value=1.0, psi=0.0, drifted=False, severity="none",
+            feature=feature,
+            dtype="categorical",
+            method="chi2",
+            statistic=0.0,
+            p_value=1.0,
+            psi=0.0,
+            drifted=False,
+            severity="none",
         )
 
     stat, p = stats.chisquare(
@@ -223,10 +239,16 @@ def _drift_categorical(
         else "warning" if drifted or psi >= PSI_WARNING else "none"
     )
     return FeatureDriftResult(
-        feature=feature, dtype="categorical", method="chi2",
-        statistic=round(float(stat), 6), p_value=round(float(p), 6),
-        psi=psi, drifted=drifted, severity=severity,
-        ref_top_values=ref_top, cur_top_values=cur_top,
+        feature=feature,
+        dtype="categorical",
+        method="chi2",
+        statistic=round(float(stat), 6),
+        p_value=round(float(p), 6),
+        psi=psi,
+        drifted=drifted,
+        severity=severity,
+        ref_top_values=ref_top,
+        cur_top_values=cur_top,
     )
 
 
@@ -328,7 +350,9 @@ def compute_drift_report(
 
     for feat in numerical_features:
         if feat not in reference_df.columns or feat not in current_df.columns:
-            log.warning("Numerical feature '%s' missing in one dataset, skipping.", feat)
+            log.warning(
+                "Numerical feature '%s' missing in one dataset, skipping.", feat
+            )
             continue
         try:
             feature_results.append(
@@ -339,7 +363,9 @@ def compute_drift_report(
 
     for feat in categorical_features:
         if feat not in reference_df.columns or feat not in current_df.columns:
-            log.warning("Categorical feature '%s' missing in one dataset, skipping.", feat)
+            log.warning(
+                "Categorical feature '%s' missing in one dataset, skipping.", feat
+            )
             continue
         try:
             feature_results.append(
@@ -393,8 +419,11 @@ def compute_drift_report(
 
     log.info(
         "Drift report %s | drifted=%s | features=%d/%d | prediction=%s",
-        report_id, overall_drifted, len(drifted_features),
-        len(feature_results), pred_drift.drifted,
+        report_id,
+        overall_drifted,
+        len(drifted_features),
+        len(feature_results),
+        pred_drift.drifted,
     )
     return report
 
@@ -408,4 +437,6 @@ def load_latest_drift_report() -> Optional[DriftReport]:
         data = json.load(f)
     feature_results = [FeatureDriftResult(**r) for r in data.pop("feature_results", [])]
     pred_drift = PredictionDriftResult(**data.pop("prediction_drift", {}))
-    return DriftReport(**data, feature_results=feature_results, prediction_drift=pred_drift)
+    return DriftReport(
+        **data, feature_results=feature_results, prediction_drift=pred_drift
+    )

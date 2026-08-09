@@ -43,9 +43,18 @@ RETRAIN_VAR_KEY = "drift_retrain_triggered"
 
 # Metadata columns in prediction logs — excluded from feature drift comparison
 _LOG_META_COLS = {
-    "request_id", "timestamp", "model_version", "model_alias",
-    "prediction", "probability_class_0", "probability_class_1",
-    "confidence", "latency_ms", "ground_truth", "warnings", "schema_version",
+    "request_id",
+    "timestamp",
+    "model_version",
+    "model_alias",
+    "prediction",
+    "probability_class_0",
+    "probability_class_1",
+    "confidence",
+    "latency_ms",
+    "ground_truth",
+    "warnings",
+    "schema_version",
 }
 
 DEFAULT_ARGS = {
@@ -88,7 +97,9 @@ def task_load_reference(**ctx):
         candidates = sorted(Path(ARTIFACTS_DIR).rglob("*.parquet"), reverse=True)
         candidates = [p for p in candidates if "live_window" not in p.name]
         if not candidates:
-            raise FileNotFoundError("No reference features parquet found in artifacts/.")
+            raise FileNotFoundError(
+                "No reference features parquet found in artifacts/."
+            )
         ref_path = candidates[0]
         log.warning("Exact reference not found, using fallback: %s", ref_path)
 
@@ -128,9 +139,9 @@ def task_fetch_live_window(**ctx):
     except Exception as e:
         log.warning("Logger DB unavailable (%s). Falling back to JSONL files.", e)
         rows = []
-        jsonl_files = sorted(
-            glob.glob(f"{ARTIFACTS_DIR}/logs/*.jsonl"), reverse=True
-        )[:7]
+        jsonl_files = sorted(glob.glob(f"{ARTIFACTS_DIR}/logs/*.jsonl"), reverse=True)[
+            :7
+        ]
         for path in jsonl_files:
             with open(path) as fh:
                 for line in fh:
@@ -159,7 +170,10 @@ def task_fetch_live_window(**ctx):
     ti.xcom_push(key="live_size", value=len(df))
     log.info(
         "Live window saved: %d rows [%s → %s] → %s",
-        len(df), window_start.isoformat(), window_end.isoformat(), live_path,
+        len(df),
+        window_start.isoformat(),
+        window_end.isoformat(),
+        live_path,
     )
 
 
@@ -173,7 +187,9 @@ def task_compute_drift(**ctx):
 
     ti = ctx["ti"]
     ref_df = pd.read_parquet(ti.xcom_pull(task_ids="load_reference", key="ref_path"))
-    live_df = pd.read_parquet(ti.xcom_pull(task_ids="fetch_live_window", key="live_path"))
+    live_df = pd.read_parquet(
+        ti.xcom_pull(task_ids="fetch_live_window", key="live_path")
+    )
     version = ti.xcom_pull(task_ids="load_reference", key="model_version")
     w_start = ti.xcom_pull(task_ids="fetch_live_window", key="window_start")
     w_end = ti.xcom_pull(task_ids="fetch_live_window", key="window_end")
@@ -220,7 +236,9 @@ def task_compute_quality(**ctx):
     from monitoring.quality_report import compute_quality_report  # noqa: PLC0415
 
     ti = ctx["ti"]
-    live_df = pd.read_parquet(ti.xcom_pull(task_ids="fetch_live_window", key="live_path"))
+    live_df = pd.read_parquet(
+        ti.xcom_pull(task_ids="fetch_live_window", key="live_path")
+    )
     version = ti.xcom_pull(task_ids="load_reference", key="model_version")
     w_start = ti.xcom_pull(task_ids="fetch_live_window", key="window_start")
     w_end = ti.xcom_pull(task_ids="fetch_live_window", key="window_end")
@@ -249,7 +267,9 @@ def task_gate(**ctx):
     Airflow Variable. retrain_trigger_dag polls this variable 30 min later.
     """
     ti = ctx["ti"]
-    drift_detected = ti.xcom_pull(task_ids="compute_drift", key="drift_detected") or False
+    drift_detected = (
+        ti.xcom_pull(task_ids="compute_drift", key="drift_detected") or False
+    )
     quality_passed = ti.xcom_pull(task_ids="compute_quality", key="quality_passed")
     critical_count = ti.xcom_pull(task_ids="compute_drift", key="critical_count") or 0
 
@@ -263,7 +283,10 @@ def task_gate(**ctx):
 
     log.info(
         "Gate: drift_detected=%s  quality_passed=%s  critical=%d  → should_retrain=%s",
-        drift_detected, quality_passed, critical_count, should_retrain,
+        drift_detected,
+        quality_passed,
+        critical_count,
+        should_retrain,
     )
 
     if should_retrain:
@@ -277,10 +300,16 @@ def _send_drift_alert(ctx, drift_detected, quality_passed, critical_count):
         ti = ctx["ti"]
         lines = []
         if drift_detected:
-            features = ti.xcom_pull(task_ids="compute_drift", key="drifted_features") or []
-            lines.append(f"Feature drift detected: {features}  (critical={critical_count})")
+            features = (
+                ti.xcom_pull(task_ids="compute_drift", key="drifted_features") or []
+            )
+            lines.append(
+                f"Feature drift detected: {features}  (critical={critical_count})"
+            )
         if not quality_passed:
-            failures = ti.xcom_pull(task_ids="compute_quality", key="hard_failures") or []
+            failures = (
+                ti.xcom_pull(task_ids="compute_quality", key="hard_failures") or []
+            )
             lines.append(f"Quality hard failures: {failures}")
 
         send_alert(
@@ -324,10 +353,18 @@ with DAG(
     doc_md=__doc__,
 ) as dag:
 
-    t_ref = PythonOperator(task_id="load_reference", python_callable=task_load_reference)
-    t_live = PythonOperator(task_id="fetch_live_window", python_callable=task_fetch_live_window)
-    t_drift = PythonOperator(task_id="compute_drift", python_callable=task_compute_drift)
-    t_quality = PythonOperator(task_id="compute_quality", python_callable=task_compute_quality)
+    t_ref = PythonOperator(
+        task_id="load_reference", python_callable=task_load_reference
+    )
+    t_live = PythonOperator(
+        task_id="fetch_live_window", python_callable=task_fetch_live_window
+    )
+    t_drift = PythonOperator(
+        task_id="compute_drift", python_callable=task_compute_drift
+    )
+    t_quality = PythonOperator(
+        task_id="compute_quality", python_callable=task_compute_quality
+    )
     t_gate = PythonOperator(task_id="gate", python_callable=task_gate)
 
     # drift and quality run in parallel after live window is ready

@@ -222,6 +222,7 @@ def get_metrics_snapshot() -> dict[str, Any]:
     """Return real-time snapshot of API prediction metrics including request counts, error rate, and latency."""
     try:
         from api.metrics import get_snapshot
+
         snapshot = get_snapshot()
         return snapshot.__dict__
     except Exception as exc:
@@ -250,13 +251,13 @@ def get_prediction_logs(hours: int = 6) -> dict[str, Any]:
     try:
         from api.logger import query_logs
         from datetime import datetime, timedelta
+
         end = datetime.utcnow()
         start = end - timedelta(hours=hours)
         df = query_logs(start, end, limit=500)
         records = df.to_dict("records") if not df.empty else []
     except Exception as exc:
         return {"error": str(exc)}
-
 
     if not records:
         return {
@@ -267,8 +268,12 @@ def get_prediction_logs(hours: int = 6) -> dict[str, Any]:
 
     import statistics
 
-    predictions = [r.get("prediction") for r in records if r.get("prediction") is not None]
-    confidences = [r.get("confidence") for r in records if r.get("confidence") is not None]
+    predictions = [
+        r.get("prediction") for r in records if r.get("prediction") is not None
+    ]
+    confidences = [
+        r.get("confidence") for r in records if r.get("confidence") is not None
+    ]
     labeled = [r for r in records if r.get("ground_truth") is not None]
 
     class_counts = {0: predictions.count(0), 1: predictions.count(1)}
@@ -277,10 +282,12 @@ def get_prediction_logs(hours: int = 6) -> dict[str, Any]:
         "hours": hours,
         "total_predictions": len(records),
         "class_distribution": class_counts,
-        "class_1_rate_pct": round(
-            class_counts[1] / len(predictions) * 100, 2
-        ) if predictions else 0,
-        "mean_confidence": round(statistics.mean(confidences), 4) if confidences else None,
+        "class_1_rate_pct": (
+            round(class_counts[1] / len(predictions) * 100, 2) if predictions else 0
+        ),
+        "mean_confidence": (
+            round(statistics.mean(confidences), 4) if confidences else None
+        ),
         "min_confidence": round(min(confidences), 4) if confidences else None,
         "max_confidence": round(max(confidences), 4) if confidences else None,
         "labeled_count": len(labeled),

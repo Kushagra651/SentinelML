@@ -219,6 +219,7 @@ def get_logs(hours: int = 1, limit: int = 100):
 @app.post("/agent/query")
 async def agent_query(body: dict):
     import time
+
     question = body.get("question", "").strip()
     if not question:
         raise HTTPException(status_code=400, detail="question is required")

@@ -67,7 +67,10 @@ def _post_json(url: str, payload: dict) -> tuple[int, str]:
     req = urllib.request.Request(
         url,
         data=data,
-        headers={"Content-Type": "application/json", "User-Agent": "SentinelML-Alerting/1.0"},
+        headers={
+            "Content-Type": "application/json",
+            "User-Agent": "SentinelML-Alerting/1.0",
+        },
         method="POST",
     )
     with urllib.request.urlopen(req, timeout=_HTTP_TIMEOUT) as resp:
@@ -99,9 +102,11 @@ def _send_slack(title: str, message: str, severity: str, labels: dict) -> bool:
         "text": f"{emoji} *{title}*{label_str}",
         "attachments": [
             {
-                "color": {"info": "#36a64f", "warning": "#ff9900", "critical": "#cc0000"}.get(
-                    severity, "#cccccc"
-                ),
+                "color": {
+                    "info": "#36a64f",
+                    "warning": "#ff9900",
+                    "critical": "#cc0000",
+                }.get(severity, "#cccccc"),
                 "text": message,
                 "footer": f"SentinelML | {datetime.now(timezone.utc).strftime('%Y-%m-%dT%H:%M:%SZ')}",
             }
@@ -214,7 +219,10 @@ def _log_only(title: str, message: str, severity: str, labels: dict) -> bool:
     """Logs the alert without sending anywhere. Always succeeds."""
     log.info(
         "ALERT [%s] %s | %s | labels=%s",
-        severity.upper(), title, message, labels,
+        severity.upper(),
+        title,
+        message,
+        labels,
     )
     return True
 

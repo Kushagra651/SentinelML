@@ -81,6 +81,7 @@ def _get_conn():
     """Open a new psycopg2 connection. Caller must close it."""
     try:
         import psycopg2
+
         return psycopg2.connect(_DSN)
     except Exception as exc:
         log.error("DB connection failed: %s", exc)
@@ -135,15 +136,18 @@ def log_query(
         conn = _get_conn()
         with conn:
             with conn.cursor() as cur:
-                cur.execute(_INSERT_SQL, (
-                    datetime.now(timezone.utc),
-                    question,
-                    answer,
-                    json.dumps(tools_called or []),
-                    latency_ms,
-                    model_version,
-                    error,
-                ))
+                cur.execute(
+                    _INSERT_SQL,
+                    (
+                        datetime.now(timezone.utc),
+                        question,
+                        answer,
+                        json.dumps(tools_called or []),
+                        latency_ms,
+                        model_version,
+                        error,
+                    ),
+                )
         conn.close()
         log.debug(
             "Agent query logged — tools=%s latency=%.1fms",

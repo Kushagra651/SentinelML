@@ -109,9 +109,7 @@ def _impute(df: pd.DataFrame) -> pd.DataFrame:
 
     for col in CATEGORICAL_COLS:
         if col in df.columns and df[col].isna().any():
-            mode_val = (
-                df[col].mode().iloc[0] if not df[col].mode().empty else "unknown"
-            )
+            mode_val = df[col].mode().iloc[0] if not df[col].mode().empty else "unknown"
             df[col] = df[col].fillna(mode_val)
             logger.debug("Imputed '%s' with mode='%s'", col, mode_val)
 

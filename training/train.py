@@ -133,7 +133,9 @@ def run_training(
 
     logger.info(
         "Loaded %d rows × %d cols in %.2fs",
-        len(raw_df), raw_df.shape[1], time.perf_counter() - t0,
+        len(raw_df),
+        raw_df.shape[1],
+        time.perf_counter() - t0,
     )
 
     # ── Step 2: Validate ──────────────────────────────────────────────────────
@@ -163,7 +165,8 @@ def run_training(
     logger.info("Step 4/7 — Splitting data (val=%.0f%%) …", VALIDATION_SPLIT * 100)
 
     X_train, X_val, y_train, y_val = train_test_split(
-        X, y,
+        X,
+        y,
         test_size=VALIDATION_SPLIT,
         random_state=RANDOM_SEED,
         stratify=y,
@@ -224,7 +227,8 @@ def run_training(
     logger.info("=" * 60)
     logger.info(
         "Training COMPLETE  |  version: %s  |  val_acc: %.4f",
-        version_tag, val_accuracy,
+        version_tag,
+        val_accuracy,
     )
     logger.info("=" * 60)
 
@@ -259,8 +263,7 @@ if __name__ == "__main__":
     args = parser.parse_args()
 
     overrides = {
-        k: v for k, v in vars(args).items()
-        if v is not None and k != "data_source"
+        k: v for k, v in vars(args).items() if v is not None and k != "data_source"
     }
 
     result = run_training(model_params=overrides or None, data_source=args.data_source)

@@ -121,7 +121,7 @@ def _load_raw_csv(path: Path, skip_rows: int = 0) -> pd.DataFrame:
         names=COLUMN_NAMES,
         skiprows=skip_rows,
         skipinitialspace=True,  # UCI values have leading spaces e.g. " Private"
-        na_values="?",          # UCI encodes missing values as "?"
+        na_values="?",  # UCI encodes missing values as "?"
     )
     return df
 

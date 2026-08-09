@@ -152,7 +152,9 @@ class PredictionInput(BaseModel):
     # Numerical features
     age: int = Field(..., ge=17, le=90, description="Age in years")
     fnlwgt: int = Field(..., ge=1, description="Final weight (census sampling weight)")
-    education_num: int = Field(..., ge=1, le=16, description="Education level as integer")
+    education_num: int = Field(
+        ..., ge=1, le=16, description="Education level as integer"
+    )
     capital_gain: float = Field(..., ge=0, description="Capital gain in USD")
     capital_loss: float = Field(..., ge=0, description="Capital loss in USD")
     hours_per_week: int = Field(..., ge=1, le=99, description="Hours worked per week")
@@ -216,7 +218,9 @@ class PredictionOutput(BaseModel):
     latency_ms: float = Field(..., description="Inference latency in milliseconds")
     features_used: list[str] = Field(..., description="Feature names used by the model")
     warnings: list[str] = Field(default_factory=list, description="Non-fatal warnings")
-    request_id: Optional[str] = Field(None, description="Echo of caller-supplied request ID")
+    request_id: Optional[str] = Field(
+        None, description="Echo of caller-supplied request ID"
+    )
 
 
 class PredictionLog(BaseModel):

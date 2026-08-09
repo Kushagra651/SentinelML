@@ -430,9 +430,13 @@ def query_logs(
     Falls back to reading the JSONL file if DB is unavailable.
     """
     if _PSYCOPG2_AVAILABLE:
-        return _query_logs_db(start, end, model_version, include_ground_truth_only, limit)
+        return _query_logs_db(
+            start, end, model_version, include_ground_truth_only, limit
+        )
     logger.warning("query_logs: DB unavailable — reading from JSONL fallback")
-    return _query_logs_jsonl(start, end, model_version, include_ground_truth_only, limit)
+    return _query_logs_jsonl(
+        start, end, model_version, include_ground_truth_only, limit
+    )
 
 
 def _query_logs_db(
@@ -536,12 +540,22 @@ if __name__ == "__main__":
         model_alias = "production"
         warnings: list[str] = []
 
-    features = {"age": 34, "fnlwgt": 200000, "education_num": 13,
-                "capital_gain": 0, "capital_loss": 0, "hours_per_week": 40,
-                "workclass": "Private", "education": "Bachelors",
-                "marital_status": "Never-married", "occupation": "Craft-repair",
-                "relationship": "Not-in-family", "race": "White",
-                "sex": "Male", "native_country": "United-States"}
+    features = {
+        "age": 34,
+        "fnlwgt": 200000,
+        "education_num": 13,
+        "capital_gain": 0,
+        "capital_loss": 0,
+        "hours_per_week": 40,
+        "workclass": "Private",
+        "education": "Bachelors",
+        "marital_status": "Never-married",
+        "occupation": "Craft-repair",
+        "relationship": "Not-in-family",
+        "race": "White",
+        "sex": "Male",
+        "native_country": "United-States",
+    }
 
     rid = log_prediction_from_result(features, _FakeResult())
     logger.info("Logged request_id: %s", rid)

@@ -40,43 +40,120 @@ GRAFANA_BASE = "http://localhost:3000"
 GRAFANA_DASHBOARD_UID = "ml-monitoring-mai"
 
 SERVICES = [
-    {"name": "ML API",        "url": f"{API_BASE}/health",               "port": 8000},
-    {"name": "Prometheus",    "url": "http://localhost:9090/-/healthy",   "port": 9090},
-    {"name": "Grafana",       "url": "http://localhost:3000/api/health",  "port": 3000},
-    {"name": "Airflow",       "url": "http://localhost:8080/health",      "port": 8080},
-    {"name": "cAdvisor",      "url": "http://localhost:8081/healthz",     "port": 8081},
-    {"name": "Node Exporter", "url": "http://localhost:9101/metrics",     "port": 9101},
-    {"name": "Exporter",      "url": "http://localhost:9100/metrics",     "port": 9100},
-    {"name": "PostgreSQL",    "url": f"{API_BASE}/health",                   "port": 5432},
+    {"name": "ML API", "url": f"{API_BASE}/health", "port": 8000},
+    {"name": "Prometheus", "url": "http://localhost:9090/-/healthy", "port": 9090},
+    {"name": "Grafana", "url": "http://localhost:3000/api/health", "port": 3000},
+    {"name": "Airflow", "url": "http://localhost:8080/health", "port": 8080},
+    {"name": "cAdvisor", "url": "http://localhost:8081/healthz", "port": 8081},
+    {"name": "Node Exporter", "url": "http://localhost:9101/metrics", "port": 9101},
+    {"name": "Exporter", "url": "http://localhost:9100/metrics", "port": 9100},
+    {"name": "PostgreSQL", "url": f"{API_BASE}/health", "port": 5432},
 ]
 
 # UCI Adult feature definitions
-WORKCLASS_OPTS = ["Private", "Self-emp-not-inc", "Self-emp-inc", "Federal-gov",
-                  "Local-gov", "State-gov", "Without-pay", "Never-worked"]
-EDUCATION_OPTS = ["Bachelors", "Some-college", "11th", "HS-grad", "Prof-school",
-                  "Assoc-acdm", "Assoc-voc", "9th", "7th-8th", "12th", "Masters",
-                  "1st-4th", "10th", "Doctorate", "5th-6th", "Preschool"]
-MARITAL_OPTS   = ["Married-civ-spouse", "Divorced", "Never-married", "Separated",
-                  "Widowed", "Married-spouse-absent", "Married-AF-spouse"]
-OCCUPATION_OPTS= ["Tech-support", "Craft-repair", "Other-service", "Sales",
-                  "Exec-managerial", "Prof-specialty", "Handlers-cleaners",
-                  "Machine-op-inspct", "Adm-clerical", "Farming-fishing",
-                  "Transport-moving", "Priv-house-serv", "Protective-serv",
-                  "Armed-Forces"]
-RELATIONSHIP_OPTS = ["Wife", "Own-child", "Husband", "Not-in-family",
-                     "Other-relative", "Unmarried"]
-RACE_OPTS      = ["White", "Asian-Pac-Islander", "Amer-Indian-Eskimo",
-                  "Other", "Black"]
-SEX_OPTS       = ["Male", "Female"]
-COUNTRY_OPTS   = ["United-States", "Cuba", "Jamaica", "India", "Mexico",
-                  "South", "Japan", "Greece", "China", "Ecuador", "Italy",
-                  "Poland", "Columbia", "Cambodia", "Thailand", "Laos",
-                  "Taiwan", "Haiti", "Portugal", "Dominican-Republic",
-                  "El-Salvador", "France", "Guatemala", "China", "Nicaragua",
-                  "Scotland", "Thailand", "Yugoslavia", "Puerto-Rico",
-                  "Outlying-US(Guam-USVI-etc)", "Hungary", "Honduras",
-                  "Hong", "Ireland", "Trinadad&Tobago", "Peru",
-                  "Vietnam", "Iran"]
+WORKCLASS_OPTS = [
+    "Private",
+    "Self-emp-not-inc",
+    "Self-emp-inc",
+    "Federal-gov",
+    "Local-gov",
+    "State-gov",
+    "Without-pay",
+    "Never-worked",
+]
+EDUCATION_OPTS = [
+    "Bachelors",
+    "Some-college",
+    "11th",
+    "HS-grad",
+    "Prof-school",
+    "Assoc-acdm",
+    "Assoc-voc",
+    "9th",
+    "7th-8th",
+    "12th",
+    "Masters",
+    "1st-4th",
+    "10th",
+    "Doctorate",
+    "5th-6th",
+    "Preschool",
+]
+MARITAL_OPTS = [
+    "Married-civ-spouse",
+    "Divorced",
+    "Never-married",
+    "Separated",
+    "Widowed",
+    "Married-spouse-absent",
+    "Married-AF-spouse",
+]
+OCCUPATION_OPTS = [
+    "Tech-support",
+    "Craft-repair",
+    "Other-service",
+    "Sales",
+    "Exec-managerial",
+    "Prof-specialty",
+    "Handlers-cleaners",
+    "Machine-op-inspct",
+    "Adm-clerical",
+    "Farming-fishing",
+    "Transport-moving",
+    "Priv-house-serv",
+    "Protective-serv",
+    "Armed-Forces",
+]
+RELATIONSHIP_OPTS = [
+    "Wife",
+    "Own-child",
+    "Husband",
+    "Not-in-family",
+    "Other-relative",
+    "Unmarried",
+]
+RACE_OPTS = ["White", "Asian-Pac-Islander", "Amer-Indian-Eskimo", "Other", "Black"]
+SEX_OPTS = ["Male", "Female"]
+COUNTRY_OPTS = [
+    "United-States",
+    "Cuba",
+    "Jamaica",
+    "India",
+    "Mexico",
+    "South",
+    "Japan",
+    "Greece",
+    "China",
+    "Ecuador",
+    "Italy",
+    "Poland",
+    "Columbia",
+    "Cambodia",
+    "Thailand",
+    "Laos",
+    "Taiwan",
+    "Haiti",
+    "Portugal",
+    "Dominican-Republic",
+    "El-Salvador",
+    "France",
+    "Guatemala",
+    "China",
+    "Nicaragua",
+    "Scotland",
+    "Thailand",
+    "Yugoslavia",
+    "Puerto-Rico",
+    "Outlying-US(Guam-USVI-etc)",
+    "Hungary",
+    "Honduras",
+    "Hong",
+    "Ireland",
+    "Trinadad&Tobago",
+    "Peru",
+    "Vietnam",
+    "Iran",
+]
 
 # ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -208,23 +285,31 @@ def page_predict():
     with st.form("predict_form"):
         st.subheader("Numerical Features")
         c1, c2, c3 = st.columns(3)
-        age           = c1.number_input("Age",            min_value=17,  max_value=90,    value=35)
-        fnlwgt        = c2.number_input("fnlwgt",         min_value=1,   max_value=999999, value=200000)
-        education_num = c3.number_input("Education Num",  min_value=1,   max_value=16,    value=13)
-        capital_gain  = c1.number_input("Capital Gain",   min_value=0,   max_value=99999, value=0)
-        capital_loss  = c2.number_input("Capital Loss",   min_value=0,   max_value=99999, value=0)
-        hours_per_week= c3.number_input("Hours / Week",   min_value=1,   max_value=99,    value=40)
+        age = c1.number_input("Age", min_value=17, max_value=90, value=35)
+        fnlwgt = c2.number_input("fnlwgt", min_value=1, max_value=999999, value=200000)
+        education_num = c3.number_input(
+            "Education Num", min_value=1, max_value=16, value=13
+        )
+        capital_gain = c1.number_input(
+            "Capital Gain", min_value=0, max_value=99999, value=0
+        )
+        capital_loss = c2.number_input(
+            "Capital Loss", min_value=0, max_value=99999, value=0
+        )
+        hours_per_week = c3.number_input(
+            "Hours / Week", min_value=1, max_value=99, value=40
+        )
 
         st.subheader("Categorical Features")
         c4, c5 = st.columns(2)
-        workclass      = c4.selectbox("Workclass",       WORKCLASS_OPTS)
-        education      = c5.selectbox("Education",       EDUCATION_OPTS, index=0)
-        marital_status = c4.selectbox("Marital Status",  MARITAL_OPTS)
-        occupation     = c5.selectbox("Occupation",      OCCUPATION_OPTS)
-        relationship   = c4.selectbox("Relationship",    RELATIONSHIP_OPTS)
-        race           = c5.selectbox("Race",            RACE_OPTS)
-        sex            = c4.selectbox("Sex",             SEX_OPTS)
-        native_country = c5.selectbox("Native Country",  COUNTRY_OPTS)
+        workclass = c4.selectbox("Workclass", WORKCLASS_OPTS)
+        education = c5.selectbox("Education", EDUCATION_OPTS, index=0)
+        marital_status = c4.selectbox("Marital Status", MARITAL_OPTS)
+        occupation = c5.selectbox("Occupation", OCCUPATION_OPTS)
+        relationship = c4.selectbox("Relationship", RELATIONSHIP_OPTS)
+        race = c5.selectbox("Race", RACE_OPTS)
+        sex = c4.selectbox("Sex", SEX_OPTS)
+        native_country = c5.selectbox("Native Country", COUNTRY_OPTS)
 
         submitted = st.form_submit_button("⚡ Predict", use_container_width=True)
 
@@ -232,12 +317,20 @@ def page_predict():
         return
 
     payload = {
-        "age": age, "fnlwgt": fnlwgt, "education_num": education_num,
-        "capital_gain": capital_gain, "capital_loss": capital_loss,
-        "hours_per_week": hours_per_week, "workclass": workclass,
-        "education": education, "marital_status": marital_status,
-        "occupation": occupation, "relationship": relationship,
-        "race": race, "sex": sex, "native_country": native_country,
+        "age": age,
+        "fnlwgt": fnlwgt,
+        "education_num": education_num,
+        "capital_gain": capital_gain,
+        "capital_loss": capital_loss,
+        "hours_per_week": hours_per_week,
+        "workclass": workclass,
+        "education": education,
+        "marital_status": marital_status,
+        "occupation": occupation,
+        "relationship": relationship,
+        "race": race,
+        "sex": sex,
+        "native_country": native_country,
     }
 
     with st.spinner("Running inference…"):
@@ -247,8 +340,8 @@ def page_predict():
         st.error(f"Prediction failed: {result}")
         return
 
-    pred  = result.get("prediction", result.get("predicted_class"))
-    conf  = result.get("confidence", 0)
+    pred = result.get("prediction", result.get("predicted_class"))
+    conf = result.get("confidence", 0)
     prob1 = result.get("probability_class_1", 0)
     label = ">50K 💰" if pred == 1 else "≤50K"
     color = "green" if pred == 1 else "orange"
@@ -256,30 +349,32 @@ def page_predict():
     st.markdown(f"### Prediction: :{color}[**{label}**]")
 
     m1, m2, m3, m4 = st.columns(4)
-    m1.metric("Confidence",    f"{conf:.1%}")
-    m2.metric("P(>50K)",       f"{prob1:.1%}")
-    m3.metric("Latency",       f"{result.get('latency_ms', 0):.1f} ms")
+    m1.metric("Confidence", f"{conf:.1%}")
+    m2.metric("P(>50K)", f"{prob1:.1%}")
+    m3.metric("Latency", f"{result.get('latency_ms', 0):.1f} ms")
     m4.metric("Model Version", result.get("model_version", "—"))
 
     if result.get("warnings"):
         st.warning("Warnings: " + " | ".join(result["warnings"]))
 
     # Gauge chart
-    fig = go.Figure(go.Indicator(
-        mode="gauge+number",
-        value=round(prob1 * 100, 1),
-        title={"text": "P(income > 50K) %"},
-        gauge={
-            "axis": {"range": [0, 100]},
-            "bar":  {"color": color},
-            "steps": [
-                {"range": [0, 40],  "color": "#f0f0f0"},
-                {"range": [40, 60], "color": "#ffe082"},
-                {"range": [60, 100],"color": "#c8e6c9"},
-            ],
-            "threshold": {"line": {"color": "red", "width": 2}, "value": 50},
-        },
-    ))
+    fig = go.Figure(
+        go.Indicator(
+            mode="gauge+number",
+            value=round(prob1 * 100, 1),
+            title={"text": "P(income > 50K) %"},
+            gauge={
+                "axis": {"range": [0, 100]},
+                "bar": {"color": color},
+                "steps": [
+                    {"range": [0, 40], "color": "#f0f0f0"},
+                    {"range": [40, 60], "color": "#ffe082"},
+                    {"range": [60, 100], "color": "#c8e6c9"},
+                ],
+                "threshold": {"line": {"color": "red", "width": 2}, "value": 50},
+            },
+        )
+    )
     fig.update_layout(height=250, margin=dict(t=40, b=0))
     st.plotly_chart(fig, use_container_width=True)
 
@@ -292,22 +387,30 @@ def page_live_demo():
     st.caption("Send bursts of predictions to generate Grafana traffic.")
 
     SAMPLE_PAYLOAD = {
-        "age": 35, "workclass": "Private", "fnlwgt": 200000,
-        "education": "Bachelors", "education_num": 13,
-        "marital_status": "Married-civ-spouse", "occupation": "Exec-managerial",
-        "relationship": "Husband", "race": "White", "sex": "Male",
-        "capital_gain": 0, "capital_loss": 0,
-        "hours_per_week": 40, "native_country": "United-States",
+        "age": 35,
+        "workclass": "Private",
+        "fnlwgt": 200000,
+        "education": "Bachelors",
+        "education_num": 13,
+        "marital_status": "Married-civ-spouse",
+        "occupation": "Exec-managerial",
+        "relationship": "Husband",
+        "race": "White",
+        "sex": "Male",
+        "capital_gain": 0,
+        "capital_loss": 0,
+        "hours_per_week": 40,
+        "native_country": "United-States",
     }
 
     col1, col2 = st.columns(2)
     n_requests = col1.slider("Number of requests", 1, 100, 20)
-    delay_ms   = col2.slider("Delay between requests (ms)", 0, 500, 100)
+    delay_ms = col2.slider("Delay between requests (ms)", 0, 500, 100)
 
     if st.button("🚀 Send Traffic Burst", use_container_width=True):
         progress = st.progress(0)
-        results  = []
-        status   = st.empty()
+        results = []
+        status = st.empty()
 
         for i in range(n_requests):
             r = _post("/predict", SAMPLE_PAYLOAD)
@@ -318,26 +421,33 @@ def page_live_demo():
                 time.sleep(delay_ms / 1000)
 
         status.empty()
-        errors  = [r for r in results if r and "error" in r]
+        errors = [r for r in results if r and "error" in r]
         success = [r for r in results if r and "error" not in r]
-        confs   = [r.get("confidence", 0) for r in success if r]
-        class1  = sum(1 for r in success if r and r.get("prediction") == 1)
+        confs = [r.get("confidence", 0) for r in success if r]
+        class1 = sum(1 for r in success if r and r.get("prediction") == 1)
 
         st.success(f"✅ {len(success)} succeeded  |  ❌ {len(errors)} failed")
         m1, m2, m3 = st.columns(3)
-        m1.metric("Class >50K",      f"{class1}/{len(success)}")
+        m1.metric("Class >50K", f"{class1}/{len(success)}")
         m2.metric("Mean Confidence", f"{sum(confs)/len(confs):.1%}" if confs else "—")
-        m3.metric("Errors",          len(errors))
+        m3.metric("Errors", len(errors))
 
     st.divider()
     st.subheader("Live API Metrics")
     snapshot = _get("/metrics/summary")
     if snapshot:
         m1, m2, m3, m4 = st.columns(4)
-        m1.metric("Total Requests",  snapshot.get("requests_total", "—"))
-        m2.metric("Error Rate",      f"{snapshot.get('error_rate_per_sec', 0):.4f}/s")
-        m3.metric("Mean Confidence", f"{snapshot.get('mean_confidence', 0):.1%}" if snapshot.get('mean_confidence') else "—")
-        m4.metric("Request Rate",    f"{snapshot.get('request_rate_per_sec', 0):.2f}/s")
+        m1.metric("Total Requests", snapshot.get("requests_total", "—"))
+        m2.metric("Error Rate", f"{snapshot.get('error_rate_per_sec', 0):.4f}/s")
+        m3.metric(
+            "Mean Confidence",
+            (
+                f"{snapshot.get('mean_confidence', 0):.1%}"
+                if snapshot.get("mean_confidence")
+                else "—"
+            ),
+        )
+        m4.metric("Request Rate", f"{snapshot.get('request_rate_per_sec', 0):.2f}/s")
     else:
         st.warning("Could not reach /metrics/summary")
 
@@ -381,22 +491,37 @@ def page_logs():
 
         # Confidence histogram
         if "confidence" in df.columns:
-            fig = go.Figure(go.Histogram(
-                x=df["confidence"], nbinsx=20,
-                marker_color="#4CAF50", opacity=0.75,
-            ))
+            fig = go.Figure(
+                go.Histogram(
+                    x=df["confidence"],
+                    nbinsx=20,
+                    marker_color="#4CAF50",
+                    opacity=0.75,
+                )
+            )
             fig.update_layout(
                 title="Confidence Distribution",
-                xaxis_title="Confidence", yaxis_title="Count",
-                height=250, margin=dict(t=40, b=30),
+                xaxis_title="Confidence",
+                yaxis_title="Count",
+                height=250,
+                margin=dict(t=40, b=30),
             )
             st.plotly_chart(fig, use_container_width=True)
 
         # Table — show key columns only
-        display_cols = [c for c in
-            ["request_id", "timestamp", "prediction", "confidence",
-             "model_version", "latency_ms", "ground_truth"]
-            if c in df.columns]
+        display_cols = [
+            c
+            for c in [
+                "request_id",
+                "timestamp",
+                "prediction",
+                "confidence",
+                "model_version",
+                "latency_ms",
+                "ground_truth",
+            ]
+            if c in df.columns
+        ]
         st.dataframe(df[display_cols], use_container_width=True, height=400)
 
         # Download
@@ -417,15 +542,15 @@ def page_dashboard():
     # Key metric cards from API
     st.subheader("Live API Metrics")
     snapshot = _get("/metrics/summary")
-    model    = _get("/model/info")
+    model = _get("/model/info")
 
     if snapshot:
         m1, m2, m3, m4, m5 = st.columns(5)
-        m1.metric("Total Requests",    snapshot.get("requests_total", "—"))
-        m2.metric("Total Errors",      snapshot.get("errors_total", "—"))
-        m3.metric("Request Rate",      f"{snapshot.get('request_rate_per_sec', 0):.2f}/s")
-        m4.metric("Class 0 (≤50K)",    snapshot.get("predictions_class_0_total", "—"))
-        m5.metric("Class 1 (>50K)",    snapshot.get("predictions_class_1_total", "—"))
+        m1.metric("Total Requests", snapshot.get("requests_total", "—"))
+        m2.metric("Total Errors", snapshot.get("errors_total", "—"))
+        m3.metric("Request Rate", f"{snapshot.get('request_rate_per_sec', 0):.2f}/s")
+        m4.metric("Class 0 (≤50K)", snapshot.get("predictions_class_0_total", "—"))
+        m5.metric("Class 1 (>50K)", snapshot.get("predictions_class_1_total", "—"))
     else:
         st.warning("API metrics unavailable — is the API running?")
 
@@ -433,8 +558,11 @@ def page_dashboard():
         st.subheader("Production Model")
         c1, c2, c3, c4 = st.columns(4)
         c1.metric("Version", model.get("version") or model.get("version_tag", "—"))
-        c2.metric("Val Accuracy",  f"{model.get('val_accuracy', 0):.4f}" if model.get('val_accuracy') else "—")
-        c3.metric("Alias",         model.get("alias", "—"))
+        c2.metric(
+            "Val Accuracy",
+            f"{model.get('val_accuracy', 0):.4f}" if model.get("val_accuracy") else "—",
+        )
+        c3.metric("Alias", model.get("alias", "—"))
         c4.metric("Registered At", (model.get("registered_at") or "—")[:19])
 
     st.divider()
@@ -442,8 +570,7 @@ def page_dashboard():
     # Grafana iframe
     st.subheader("Grafana Dashboard")
     grafana_url = (
-        f"{GRAFANA_BASE}/d/{GRAFANA_DASHBOARD_UID}"
-        "?orgId=1&refresh=10s&kiosk=tv"
+        f"{GRAFANA_BASE}/d/{GRAFANA_DASHBOARD_UID}" "?orgId=1&refresh=10s&kiosk=tv"
     )
     st.markdown(
         f'<iframe src="{grafana_url}" width="100%" height="700px" '
@@ -462,14 +589,14 @@ def page_dashboard():
     st.subheader("Service Links")
     cols = st.columns(4)
     links = [
-        ("Grafana",     "http://localhost:3000"),
-        ("Prometheus",  "http://localhost:9090"),
-        ("Airflow",     "http://localhost:8080"),
-        ("API Docs",    "http://localhost:8000/docs"),
-        ("cAdvisor",    "http://localhost:8081"),
+        ("Grafana", "http://localhost:3000"),
+        ("Prometheus", "http://localhost:9090"),
+        ("Airflow", "http://localhost:8080"),
+        ("API Docs", "http://localhost:8000/docs"),
+        ("cAdvisor", "http://localhost:8081"),
         ("ML Exporter", "http://localhost:9100/metrics"),
-        ("Node Exporter","http://localhost:9101/metrics"),
-        ("API Health",  "http://localhost:8000/health"),
+        ("Node Exporter", "http://localhost:9101/metrics"),
+        ("API Health", "http://localhost:8000/health"),
     ]
     for i, (name, url) in enumerate(links):
         cols[i % 4].link_button(name, url, use_container_width=True)
@@ -492,14 +619,16 @@ def main():
     _render_sidebar()
 
     pages = {
-        "🤖 Chat":       page_chat,
-        "🎯 Predict":    page_predict,
-        "🚦 Live Demo":  page_live_demo,
-        "📋 Logs":       page_logs,
-        "📊 Dashboard":  page_dashboard,
+        "🤖 Chat": page_chat,
+        "🎯 Predict": page_predict,
+        "🚦 Live Demo": page_live_demo,
+        "📋 Logs": page_logs,
+        "📊 Dashboard": page_dashboard,
     }
 
-    page = st.sidebar.radio("Navigate", list(pages.keys()), label_visibility="collapsed")
+    page = st.sidebar.radio(
+        "Navigate", list(pages.keys()), label_visibility="collapsed"
+    )
     st.sidebar.divider()
     st.sidebar.caption(f"SentinelML · {datetime.now().strftime('%H:%M:%S')}")
 

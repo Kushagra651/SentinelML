@@ -48,7 +48,9 @@ def _label_str(labels: Optional[dict]) -> str:
     return f"{{{pairs}}}"
 
 
-def _gauge(name: str, value: float, labels: Optional[dict] = None, help_text: str = "") -> str:
+def _gauge(
+    name: str, value: float, labels: Optional[dict] = None, help_text: str = ""
+) -> str:
     """Emit HELP + TYPE + metric line for a gauge."""
     full = f"{NAMESPACE}_{name}"
     lines = []
@@ -86,6 +88,7 @@ def _collect_api_metrics() -> str:
     """
     try:
         from api.metrics import to_prometheus_text  # noqa: PLC0415
+
         return to_prometheus_text()
     except Exception as e:
         log.debug("API metrics unavailable: %s", e)
@@ -98,6 +101,7 @@ def _collect_api_metrics() -> str:
 def _collect_drift_metrics() -> str:
     try:
         from monitoring.drift_report import load_latest_drift_report  # noqa: PLC0415
+
         report = load_latest_drift_report()
     except Exception as e:
         log.error("Failed to load drift report: %s", e)
@@ -110,16 +114,44 @@ def _collect_drift_metrics() -> str:
     lines: List[str] = []
     mv = {"model_version": report.model_version}
 
-    lines.append(_gauge("drift_overall", float(report.overall_drifted), labels=mv,
-                        help_text="1 if overall drift detected in the latest window, else 0."))
-    lines.append(_gauge("drift_feature_count", float(len(report.drifted_features)), labels=mv,
-                        help_text="Number of features with detected drift."))
-    lines.append(_gauge("drift_rate_pct", float(report.summary.get("drift_rate_pct", 0.0)), labels=mv,
-                        help_text="Percentage of checked features that drifted."))
-    lines.append(_gauge("drift_critical_count", float(report.summary.get("critical_count", 0)),
-                        help_text="Features with critical drift severity."))
-    lines.append(_gauge("drift_warning_count", float(report.summary.get("warning_count", 0)),
-                        help_text="Features with warning drift severity."))
+    lines.append(
+        _gauge(
+            "drift_overall",
+            float(report.overall_drifted),
+            labels=mv,
+            help_text="1 if overall drift detected in the latest window, else 0.",
+        )
+    )
+    lines.append(
+        _gauge(
+            "drift_feature_count",
+            float(len(report.drifted_features)),
+            labels=mv,
+            help_text="Number of features with detected drift.",
+        )
+    )
+    lines.append(
+        _gauge(
+            "drift_rate_pct",
+            float(report.summary.get("drift_rate_pct", 0.0)),
+            labels=mv,
+            help_text="Percentage of checked features that drifted.",
+        )
+    )
+    lines.append(
+        _gauge(
+            "drift_critical_count",
+            float(report.summary.get("critical_count", 0)),
+            help_text="Features with critical drift severity.",
+        )
+    )
+    lines.append(
+        _gauge(
+            "drift_warning_count",
+            float(report.summary.get("warning_count", 0)),
+            help_text="Features with warning drift severity.",
+        )
+    )
 
     # Per-feature PSI (one series per feature)
     full_psi = f"{NAMESPACE}_drift_feature_psi"
@@ -127,28 +159,48 @@ def _collect_drift_metrics() -> str:
     lines.append(f"# TYPE {full_psi} gauge")
     for fr in report.feature_results:
         if fr.psi is not None:
-            lines.append(f'{full_psi}{{feature="{fr.feature}",severity="{fr.severity}"}} {fr.psi}')
+            lines.append(
+                f'{full_psi}{{feature="{fr.feature}",severity="{fr.severity}"}} {fr.psi}'
+            )
 
     # Per-feature drift flag
     full_flag = f"{NAMESPACE}_drift_feature_drifted"
     lines.append(f"# HELP {full_flag} 1 if feature drifted in the latest window.")
     lines.append(f"# TYPE {full_flag} gauge")
     for fr in report.feature_results:
-        lines.append(f'{full_flag}{{feature="{fr.feature}",method="{fr.method}"}} {float(fr.drifted)}')
+        lines.append(
+            f'{full_flag}{{feature="{fr.feature}",method="{fr.method}"}} {float(fr.drifted)}'
+        )
 
     # Prediction distribution drift
     pd_ = report.prediction_drift
-    lines.append(_gauge("drift_prediction", float(pd_.drifted), labels=mv,
-                        help_text="1 if prediction distribution drift detected."))
+    lines.append(
+        _gauge(
+            "drift_prediction",
+            float(pd_.drifted),
+            labels=mv,
+            help_text="1 if prediction distribution drift detected.",
+        )
+    )
     if pd_.psi is not None:
-        lines.append(_gauge("drift_prediction_psi", pd_.psi,
-                            help_text="PSI of prediction class distribution."))
+        lines.append(
+            _gauge(
+                "drift_prediction_psi",
+                pd_.psi,
+                help_text="PSI of prediction class distribution.",
+            )
+        )
 
     # Report staleness
     age = _report_age_seconds(report.generated_at)
     if age is not None:
-        lines.append(_gauge("drift_report_age_seconds", age,
-                            help_text="Seconds since the latest drift report was generated."))
+        lines.append(
+            _gauge(
+                "drift_report_age_seconds",
+                age,
+                help_text="Seconds since the latest drift report was generated.",
+            )
+        )
 
     return "\n".join(lines)
 
@@ -158,7 +210,10 @@ def _collect_drift_metrics() -> str:
 
 def _collect_quality_metrics() -> str:
     try:
-        from monitoring.quality_report import load_latest_quality_report  # noqa: PLC0415
+        from monitoring.quality_report import (
+            load_latest_quality_report,
+        )  # noqa: PLC0415
+
         report = load_latest_quality_report()
     except Exception as e:
         log.error("Failed to load quality report: %s", e)
@@ -171,18 +226,41 @@ def _collect_quality_metrics() -> str:
     lines: List[str] = []
     mv = {"model_version": report.model_version}
 
-    lines.append(_gauge("quality_overall_passed", float(report.overall_passed), labels=mv,
-                        help_text="1 if the latest quality report passed all hard checks."))
-    lines.append(_gauge("quality_hard_failures", float(len(report.hard_failures)),
-                        help_text="Number of hard check failures in the latest quality report."))
-    lines.append(_gauge("quality_soft_warnings", float(len(report.soft_warnings)),
-                        help_text="Number of soft warnings in the latest quality report."))
-    lines.append(_gauge("quality_window_size", float(report.window_size),
-                        help_text="Number of prediction records in the quality report window."))
+    lines.append(
+        _gauge(
+            "quality_overall_passed",
+            float(report.overall_passed),
+            labels=mv,
+            help_text="1 if the latest quality report passed all hard checks.",
+        )
+    )
+    lines.append(
+        _gauge(
+            "quality_hard_failures",
+            float(len(report.hard_failures)),
+            help_text="Number of hard check failures in the latest quality report.",
+        )
+    )
+    lines.append(
+        _gauge(
+            "quality_soft_warnings",
+            float(len(report.soft_warnings)),
+            help_text="Number of soft warnings in the latest quality report.",
+        )
+    )
+    lines.append(
+        _gauge(
+            "quality_window_size",
+            float(report.window_size),
+            help_text="Number of prediction records in the quality report window.",
+        )
+    )
 
     # Per-feature missing rate
     full_miss = f"{NAMESPACE}_quality_feature_missing_pct"
-    lines.append(f"# HELP {full_miss} Missing value rate per feature in quality window.")
+    lines.append(
+        f"# HELP {full_miss} Missing value rate per feature in quality window."
+    )
     lines.append(f"# TYPE {full_miss} gauge")
     for fq in report.feature_quality:
         lines.append(f'{full_miss}{{feature="{fq.feature}"}} {fq.missing_pct}')
@@ -215,8 +293,13 @@ def _collect_quality_metrics() -> str:
     # Report staleness
     age = _report_age_seconds(report.generated_at)
     if age is not None:
-        lines.append(_gauge("quality_report_age_seconds", age,
-                            help_text="Seconds since the latest quality report was generated."))
+        lines.append(
+            _gauge(
+                "quality_report_age_seconds",
+                age,
+                help_text="Seconds since the latest quality report was generated.",
+            )
+        )
 
     return "\n".join(lines)
 
@@ -301,10 +384,15 @@ def _main() -> None:
         format="%(asctime)s  %(levelname)-8s  %(name)s — %(message)s",
     )
     parser = argparse.ArgumentParser(description="ML Monitoring Prometheus Exporter")
-    parser.add_argument("--once", action="store_true",
-                        help="Print metrics once to stdout and exit.")
-    parser.add_argument("--port", type=int, default=EXPORTER_PORT,
-                        help=f"HTTP port (default: {EXPORTER_PORT})")
+    parser.add_argument(
+        "--once", action="store_true", help="Print metrics once to stdout and exit."
+    )
+    parser.add_argument(
+        "--port",
+        type=int,
+        default=EXPORTER_PORT,
+        help=f"HTTP port (default: {EXPORTER_PORT})",
+    )
     args = parser.parse_args()
 
     if args.once:

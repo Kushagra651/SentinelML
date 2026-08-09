@@ -139,10 +139,10 @@ class MetricsSnapshot:
     accuracy: float  # 0.0 when labeled_total == 0
 
     window_start: float  # Unix timestamp of first recorded event
-    window_end: float    # Unix timestamp of snapshot
+    window_end: float  # Unix timestamp of snapshot
 
     request_rate: float  # requests/sec over window
-    error_rate: float    # errors/sec over window
+    error_rate: float  # errors/sec over window
 
     def to_dict(self) -> dict:
         return {
@@ -380,7 +380,9 @@ def to_prometheus_text(snapshot: MetricsSnapshot | None = None) -> str:
 
     # Per-version
     for version, count in s.requests_by_version.items():
-        _counter("ml_api_requests_by_version_total", count, f'model_version="{version}"')
+        _counter(
+            "ml_api_requests_by_version_total", count, f'model_version="{version}"'
+        )
 
     # Per-error-kind
     for kind, count in s.errors_by_kind.items():
