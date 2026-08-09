@@ -68,7 +68,6 @@ def task_evaluate(**ctx):
     Runs full held-out test set evaluation.
     Raises ValueError if the promotion gate fails — DAG stops here, no bad model registered.
     """
-    import json
     from training.evaluate import evaluate
 
     ti = ctx["ti"]
