@@ -12,7 +12,7 @@ SELECT 'CREATE DATABASE airflow'
 WHERE NOT EXISTS (SELECT FROM pg_database WHERE datname = 'airflow')\gexec
 GRANT ALL PRIVILEGES ON DATABASE airflow TO mluser;
 
-\connect ml_monitoring
+
 
 -- All application tables live in the ml schema
 CREATE SCHEMA IF NOT EXISTS ml;
