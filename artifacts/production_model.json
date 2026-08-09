@@ -1,0 +1,10 @@
+{
+  "version": "v20260809_080617",
+  "alias": "production",
+  "model_path": "/app/artifacts/models/model_v20260809_080617.pkl",
+  "pipeline_path": "/app/artifacts/models/pipeline_v20260809_080617.pkl",
+  "registered_at": "2026-08-09T08:09:23.187445",
+  "status": "production",
+  "val_accuracy": 0.866733,
+  "version_tag": "20260809_080617"
+}

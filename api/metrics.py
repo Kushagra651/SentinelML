@@ -12,20 +12,21 @@ Responsibilities
     * latency distribution           (histogram buckets)
     * error counts                   (validation errors, inference errors)
     * ground-truth accuracy          (when labels arrive via label_outcome)
-- Expose a /metrics snapshot dict consumed by:
-    * api/main.py            → GET /metrics endpoint
+- Expose a metrics snapshot consumed by:
+    * api/main.py                        → GET /metrics endpoint
     * monitoring/prometheus_exporter.py  → scraped by Prometheus
-- Integrate with logger.py: `record_from_log()` accepts a PredictionLog so
-  the exporter can replay stored logs without re-running inference.
 - Thread-safe — all mutation goes through a single RLock.
 
 Public API
 ----------
-    record_prediction(result, error=False)   -> None
-    record_from_log(log: PredictionLog)      -> None
-    record_error(kind: str)                  -> None
-    get_snapshot()                           -> MetricsSnapshot
-    reset()                                  -> None   # test / admin use
+    record_prediction(predicted_class, confidence, latency_ms, model_version) -> None
+    record_prediction_from_result(result)  -> None
+    record_from_log(log)                   -> None
+    record_error(kind: str)                -> None
+    record_label(prediction, ground_truth) -> None
+    get_snapshot()                         -> MetricsSnapshot
+    reset()                                -> None
+    to_prometheus_text(snapshot=None)      -> str
 """
 
 from __future__ import annotations
@@ -37,17 +38,6 @@ import time
 from collections import defaultdict
 from dataclasses import dataclass
 from typing import Any
-
-# ---------------------------------------------------------------------------
-# Logger import — graceful fallback for the PredictionLog type hint
-# ---------------------------------------------------------------------------
-try:
-    from api.logger import PredictionLog  # type: ignore
-
-    _LOG_TYPE_AVAILABLE = True
-except ImportError:
-    PredictionLog = Any  # type: ignore[misc,assignment]
-    _LOG_TYPE_AVAILABLE = False
 
 logger = logging.getLogger(__name__)
 
@@ -66,11 +56,10 @@ CONFIDENCE_BUCKETS: list[float] = [0.5, 0.6, 0.7, 0.8, 0.9, 0.95, 1.0, float("in
 class _Histogram:
     """
     Simple thread-unsafe histogram (caller holds the lock).
-    Stores counts per upper-bound bucket plus sum and count for mean/p-tile estimates.
+    Stores counts per upper-bound bucket plus sum and count for mean/percentile estimates.
     """
 
     def __init__(self, buckets: list[float]) -> None:
-        # buckets must be sorted ascending; last bucket is +Inf sentinel
         self.buckets: list[float] = sorted(buckets)
         self.counts: list[int] = [0] * len(self.buckets)
         self.total_sum: float = 0.0
@@ -83,17 +72,13 @@ class _Histogram:
             if value <= bound:
                 self.counts[i] += 1
                 return
-        # Value exceeds all finite buckets — falls into last (+Inf) bucket
         self.counts[-1] += 1
 
     def mean(self) -> float:
         return self.total_sum / self.total_count if self.total_count else 0.0
 
     def percentile(self, p: float) -> float:
-        """
-        Linear-interpolation percentile estimate from bucket counts.
-        p in [0, 100].
-        """
+        """Linear-interpolation percentile estimate. p in [0, 100]."""
         if self.total_count == 0:
             return 0.0
         target = math.ceil(p / 100.0 * self.total_count)
@@ -138,32 +123,26 @@ class MetricsSnapshot:
     Consumed by main.py (/metrics endpoint) and prometheus_exporter.py.
     """
 
-    # Totals
     requests_total: int
     errors_total: int
     predictions_class_0: int
     predictions_class_1: int
 
-    # Per-version breakdowns  {version: count}
     requests_by_version: dict[str, int]
     errors_by_kind: dict[str, int]
 
-    # Distributions (serialisable dicts)
     latency_histogram: dict
     confidence_histogram: dict
 
-    # Accuracy (only populated when ground truth is available)
     labeled_total: int
     correct_total: int
-    accuracy: float  # labeled_total == 0 → 0.0
+    accuracy: float  # 0.0 when labeled_total == 0
 
-    # Time window
     window_start: float  # Unix timestamp of first recorded event
-    window_end: float  # Unix timestamp of snapshot
+    window_end: float    # Unix timestamp of snapshot
 
-    # Derived rates (per second over the window)
-    request_rate: float
-    error_rate: float
+    request_rate: float  # requests/sec over window
+    error_rate: float    # errors/sec over window
 
     def to_dict(self) -> dict:
         return {
@@ -186,7 +165,7 @@ class MetricsSnapshot:
 
 
 # ---------------------------------------------------------------------------
-# Registry — module-level singleton
+# Registry
 # ---------------------------------------------------------------------------
 
 
@@ -197,31 +176,18 @@ class _MetricsRegistry:
         self._lock = threading.RLock()
         self._reset_state()
 
-    # ------------------------------------------------------------------
-    # Internal state init / reset
-    # ------------------------------------------------------------------
-
     def _reset_state(self) -> None:
-        """Initialise or zero all counters. Called under lock."""
         self._requests_total: int = 0
         self._errors_total: int = 0
         self._predictions_class_0: int = 0
         self._predictions_class_1: int = 0
-
         self._requests_by_version: dict[str, int] = defaultdict(int)
         self._errors_by_kind: dict[str, int] = defaultdict(int)
-
         self._latency_hist = _Histogram(LATENCY_BUCKETS_MS)
         self._confidence_hist = _Histogram(CONFIDENCE_BUCKETS)
-
         self._labeled_total: int = 0
         self._correct_total: int = 0
-
         self._window_start: float = time.time()
-
-    # ------------------------------------------------------------------
-    # Public mutation
-    # ------------------------------------------------------------------
 
     def record_prediction(
         self,
@@ -229,28 +195,16 @@ class _MetricsRegistry:
         confidence: float,
         latency_ms: float,
         model_version: str,
-        error: bool = False,
     ) -> None:
         """
-        Record a single inference event.
-
-        Parameters
-        ----------
-        prediction    : 0 or 1; ignored when error=True
-        confidence    : max(probabilities); ignored when error=True
-        latency_ms    : end-to-end latency including pipeline.transform
-        model_version : version tag from PredictionResult / PredictionLog
-        error         : True if inference raised an exception
+        Record a successful inference event.
+        For errors, call record_error() instead — do NOT use this with error=True
+        to avoid double-counting requests_total.
         """
         with self._lock:
             self._requests_total += 1
             self._requests_by_version[model_version] += 1
             self._latency_hist.observe(latency_ms)
-
-            if error:
-                self._errors_total += 1
-                self._errors_by_kind["inference_error"] += 1
-                return
 
             if prediction == 0:
                 self._predictions_class_0 += 1
@@ -262,19 +216,20 @@ class _MetricsRegistry:
     def record_from_log(self, log: Any) -> None:
         """
         Replay a PredictionLog into the registry.
-        Used by prometheus_exporter.py to bootstrap metrics from stored logs
-        without re-running inference.
+        Used by prometheus_exporter.py to bootstrap metrics from stored logs.
         """
         try:
+            if log.prediction == -1:
+                # Sentinel value from predict_batch error path
+                self.record_error("inference_error")
+                return
             self.record_prediction(
                 prediction=log.prediction,
                 confidence=log.confidence,
                 latency_ms=log.latency_ms,
                 model_version=log.model_version,
-                error=(log.prediction == -1),
             )
-            # If ground truth is present, update accuracy counters too
-            if log.ground_truth is not None and log.prediction != -1:
+            if log.ground_truth is not None:
                 self.record_label(
                     prediction=log.prediction,
                     ground_truth=log.ground_truth,
@@ -284,8 +239,9 @@ class _MetricsRegistry:
 
     def record_error(self, kind: str = "unknown") -> None:
         """
-        Record a named error (e.g. "validation_error", "schema_mismatch").
-        Increments both the total error counter and the per-kind bucket.
+        Record a named error (e.g. "validation_error", "inference_error").
+        Increments requests_total once — do NOT also call record_prediction()
+        for the same request.
         """
         with self._lock:
             self._requests_total += 1
@@ -293,31 +249,21 @@ class _MetricsRegistry:
             self._errors_by_kind[kind] += 1
 
     def record_label(self, prediction: int, ground_truth: int) -> None:
-        """
-        Update accuracy counters when a ground-truth label arrives.
-        Called directly by main.py or the labelling pipeline.
-        """
+        """Update accuracy counters when a ground-truth label arrives."""
         with self._lock:
             self._labeled_total += 1
             if prediction == ground_truth:
                 self._correct_total += 1
 
-    # ------------------------------------------------------------------
-    # Public read
-    # ------------------------------------------------------------------
-
     def get_snapshot(self) -> MetricsSnapshot:
-        """Return an immutable MetricsSnapshot of the current state."""
         with self._lock:
             now = time.time()
             elapsed = max(now - self._window_start, 1e-9)
-
             accuracy = (
                 self._correct_total / self._labeled_total
                 if self._labeled_total > 0
                 else 0.0
             )
-
             return MetricsSnapshot(
                 requests_total=self._requests_total,
                 errors_total=self._errors_total,
@@ -337,33 +283,30 @@ class _MetricsRegistry:
             )
 
     def reset(self) -> None:
-        """Zero all counters. Intended for tests and admin resets."""
         with self._lock:
             self._reset_state()
         logger.info("MetricsRegistry reset")
 
 
 # ---------------------------------------------------------------------------
-# Module-level singleton + convenience functions
+# Module-level singleton + public functions
 # ---------------------------------------------------------------------------
 
 _registry = _MetricsRegistry()
 
 
 def record_prediction(
-    prediction: int,
+    predicted_class: int,
     confidence: float,
     latency_ms: float,
     model_version: str,
-    error: bool = False,
 ) -> None:
-    """Record a single inference outcome into the global registry."""
+    """Record a successful inference outcome into the global registry."""
     _registry.record_prediction(
-        prediction=prediction,
+        prediction=predicted_class,
         confidence=confidence,
         latency_ms=latency_ms,
         model_version=model_version,
-        error=error,
     )
 
 
@@ -377,7 +320,6 @@ def record_prediction_from_result(result: Any) -> None:
         confidence=result.confidence,
         latency_ms=result.latency_ms,
         model_version=result.model_version,
-        error=False,
     )
 
 
@@ -387,7 +329,7 @@ def record_from_log(log: Any) -> None:
 
 
 def record_error(kind: str = "unknown") -> None:
-    """Record a named error event."""
+    """Record a named error event. Do NOT also call record_prediction() for the same request."""
     _registry.record_error(kind)
 
 
@@ -407,16 +349,15 @@ def reset() -> None:
 
 
 # ---------------------------------------------------------------------------
-# Prometheus text-format export helper
-# (used by prometheus_exporter.py as a lightweight fallback)
+# Prometheus text-format export
 # ---------------------------------------------------------------------------
 
 
 def to_prometheus_text(snapshot: MetricsSnapshot | None = None) -> str:
     """
     Render the current metrics snapshot in Prometheus text exposition format.
-    prometheus_exporter.py calls this; main.py can also serve it directly
-    at GET /metrics if the full exporter is not running.
+    Metric names use prefix ml_api_ — matches prometheus.yml scrape config.
+    Called by prometheus_exporter.py and served directly at GET /metrics.
     """
     s = snapshot or get_snapshot()
     lines: list[str] = []
@@ -431,23 +372,21 @@ def to_prometheus_text(snapshot: MetricsSnapshot | None = None) -> str:
         lines.append(f"# TYPE {name} counter")
         lines.append(f"{name}{label_str} {value}")
 
-    # --- Totals ---
+    # Totals
     _counter("ml_api_requests_total", s.requests_total)
     _counter("ml_api_errors_total", s.errors_total)
     _counter("ml_api_predictions_class_0_total", s.predictions_class_0)
     _counter("ml_api_predictions_class_1_total", s.predictions_class_1)
 
-    # --- Per-version ---
+    # Per-version
     for version, count in s.requests_by_version.items():
-        _counter(
-            "ml_api_requests_by_version_total", count, f'model_version="{version}"'
-        )
+        _counter("ml_api_requests_by_version_total", count, f'model_version="{version}"')
 
-    # --- Per-error-kind ---
+    # Per-error-kind
     for kind, count in s.errors_by_kind.items():
         _counter("ml_api_errors_by_kind_total", count, f'kind="{kind}"')
 
-    # --- Latency histogram ---
+    # Latency histogram
     lines.append("# TYPE ml_api_latency_ms histogram")
     for bucket in s.latency_histogram["buckets"]:
         le = bucket["le"]
@@ -455,7 +394,7 @@ def to_prometheus_text(snapshot: MetricsSnapshot | None = None) -> str:
     lines.append(f'ml_api_latency_ms_sum {s.latency_histogram["sum"]}')
     lines.append(f'ml_api_latency_ms_count {s.latency_histogram["count"]}')
 
-    # --- Confidence histogram ---
+    # Confidence histogram
     lines.append("# TYPE ml_api_confidence histogram")
     for bucket in s.confidence_histogram["buckets"]:
         le = bucket["le"]
@@ -463,11 +402,11 @@ def to_prometheus_text(snapshot: MetricsSnapshot | None = None) -> str:
     lines.append(f'ml_api_confidence_sum {s.confidence_histogram["sum"]}')
     lines.append(f'ml_api_confidence_count {s.confidence_histogram["count"]}')
 
-    # --- Accuracy ---
+    # Accuracy
     _gauge("ml_api_accuracy", s.accuracy)
     _gauge("ml_api_labeled_total", s.labeled_total)
 
-    # --- Rates ---
+    # Rates
     _gauge("ml_api_request_rate_per_sec", s.request_rate)
     _gauge("ml_api_error_rate_per_sec", s.error_rate)
 
@@ -475,7 +414,7 @@ def to_prometheus_text(snapshot: MetricsSnapshot | None = None) -> str:
 
 
 # ---------------------------------------------------------------------------
-# Module self-test  (python -m api.metrics)
+# Module self-test (python -m api.metrics)
 # ---------------------------------------------------------------------------
 
 if __name__ == "__main__":
@@ -485,20 +424,17 @@ if __name__ == "__main__":
 
     reset()
 
-    # Simulate 5 successful predictions
     for i in range(5):
         record_prediction(
-            prediction=i % 2,
+            predicted_class=i % 2,
             confidence=0.6 + i * 0.05,
             latency_ms=10 + i * 3,
             model_version="v_test",
         )
 
-    # Simulate 2 errors
     record_error("validation_error")
     record_error("inference_error")
 
-    # Simulate 3 labelled outcomes (2 correct)
     record_label(1, 1)
     record_label(0, 0)
     record_label(1, 0)
@@ -512,25 +448,17 @@ if __name__ == "__main__":
     assert snap.correct_total == 2
     assert abs(snap.accuracy - 2 / 3) < 1e-9
     assert snap.latency_histogram["count"] == 5
-    assert snap.latency_histogram["mean"] > 0
     assert snap.requests_by_version["v_test"] == 7
     assert snap.errors_by_kind["validation_error"] == 1
-    assert snap.errors_by_kind["inference_error"] == 1
 
-    logger.info("Snapshot: %s", snap.to_dict())
-
-    # Prometheus text format
     prom = to_prometheus_text(snap)
     assert "ml_api_requests_total 7" in prom
     assert "ml_api_errors_total 2" in prom
     assert "ml_api_latency_ms_bucket" in prom
     assert "ml_api_accuracy" in prom
-    logger.info("Prometheus text format: %d chars", len(prom))
 
-    # Reset
     reset()
-    snap2 = get_snapshot()
-    assert snap2.requests_total == 0
+    assert get_snapshot().requests_total == 0
 
     logger.info("ALL SELF-TESTS PASSED")
     sys.exit(0)

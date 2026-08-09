@@ -1,0 +1,55 @@
+{
+  "models": {
+    "20260809_080617": {
+      "version_tag": "20260809_080617",
+      "status": "production",
+      "recorded_at": "2026-08-09T08:09:23.187662",
+      "reason": "Force promotion \u2014 comparison check skipped (force=True)",
+      "metrics": {
+        "accuracy": 0.866733,
+        "precision": 0.784538,
+        "recall": 0.630811,
+        "f1": 0.699326,
+        "roc_auc": 0.921158,
+        "brier_score": 0.092987,
+        "n_samples": 15060,
+        "n_positive": 3700,
+        "n_negative": 11360,
+        "positive_rate": 0.2457,
+        "decision_threshold": 0.5
+      },
+      "promote_flag": false,
+      "promotion_gate": {
+        "thresholds_used": {
+          "accuracy": 0.75,
+          "f1": 0.7,
+          "roc_auc": 0.75
+        },
+        "checks": {
+          "accuracy": true,
+          "f1": false,
+          "roc_auc": true
+        },
+        "promote": false
+      },
+      "training_context": {
+        "n_train": 24129,
+        "n_val": 6033,
+        "val_accuracy": 0.864081,
+        "hyperparameters": {
+          "n_estimators": 200,
+          "max_depth": 4,
+          "learning_rate": 0.05,
+          "subsample": 0.8,
+          "random_state": 42
+        },
+        "trained_at": "2026-08-09T08:06:22.414357"
+      },
+      "model_path": "/app/artifacts/models/model_v20260809_080617.pkl",
+      "pipeline_path": "/app/artifacts/models/pipeline_v20260809_080617.pkl",
+      "eval_report_path": "/app/artifacts/models/eval_report_v20260809_080617.json"
+    }
+  },
+  "production_version": "20260809_080617",
+  "last_promoted_at": "2026-08-09T08:09:23.187686"
+}

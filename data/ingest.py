@@ -19,12 +19,10 @@ UCI dataset source:
 from __future__ import annotations
 
 import logging
-
-# import os
+import urllib.request
 from pathlib import Path
 
 import pandas as pd
-import requests
 
 # ---------------------------------------------------------------------------
 # Logging
@@ -40,12 +38,10 @@ log = logging.getLogger(__name__)
 # Constants
 # ---------------------------------------------------------------------------
 
-# Raw UCI download URLs
 UCI_BASE_URL = "https://archive.ics.uci.edu/ml/machine-learning-databases/adult"
 TRAIN_URL = f"{UCI_BASE_URL}/adult.data"
 TEST_URL = f"{UCI_BASE_URL}/adult.test"
 
-# Local paths
 RAW_DIR = Path("data/raw")
 FEATURE_STORE = Path("data/feature_store")
 RAW_TRAIN_CSV = RAW_DIR / "adult_train.csv"
@@ -53,7 +49,7 @@ RAW_TEST_CSV = RAW_DIR / "adult_test.csv"
 CLEAN_TRAIN_FILE = FEATURE_STORE / "train.parquet"
 CLEAN_TEST_FILE = FEATURE_STORE / "test.parquet"
 
-# Column names — UCI dataset ships with no header row
+# UCI dataset ships with no header row
 COLUMN_NAMES = [
     "age",
     "workclass",
@@ -72,8 +68,7 @@ COLUMN_NAMES = [
     "income",  # target: ">50K" or "<=50K"
 ]
 
-# Target label mapping — normalise to clean strings without trailing periods
-# The test split has labels like ">50K." (with a dot) — we strip that.
+# Test split has labels like ">50K." (with trailing dot) — normalise both splits
 LABEL_MAP = {
     ">50K": ">50K",
     ">50K.": ">50K",
@@ -88,7 +83,7 @@ LABEL_MAP = {
 
 
 def _download_file(url: str, dest: Path) -> None:
-    """Download a file from url to dest, skipping if already present."""
+    """Download a file from url to dest using stdlib urllib, skipping if already present."""
     if dest.exists():
         log.info("Already downloaded: %s — skipping.", dest)
         return
@@ -96,11 +91,11 @@ def _download_file(url: str, dest: Path) -> None:
     log.info("Downloading %s → %s", url, dest)
     dest.parent.mkdir(parents=True, exist_ok=True)
 
-    response = requests.get(url, timeout=30)
-    response.raise_for_status()
+    with urllib.request.urlopen(url, timeout=30) as response:
+        content = response.read()
 
-    dest.write_bytes(response.content)
-    log.info("Saved %d bytes to %s", len(response.content), dest)
+    dest.write_bytes(content)
+    log.info("Saved %d bytes to %s", len(content), dest)
 
 
 def download_raw_data() -> None:
@@ -126,7 +121,7 @@ def _load_raw_csv(path: Path, skip_rows: int = 0) -> pd.DataFrame:
         names=COLUMN_NAMES,
         skiprows=skip_rows,
         skipinitialspace=True,  # UCI values have leading spaces e.g. " Private"
-        na_values="?",  # UCI encodes missing values as "?"
+        na_values="?",          # UCI encodes missing values as "?"
     )
     return df
 
@@ -150,7 +145,7 @@ def _clean(df: pd.DataFrame) -> pd.DataFrame:
     # 2. Normalise income labels
     df["income"] = df["income"].map(LABEL_MAP)
 
-    # 3. Drop rows with any missing categorical value
+    # 3. Drop rows with any missing value
     before = len(df)
     df = df.dropna()
     after = len(df)
@@ -173,15 +168,11 @@ def load_and_clean(split: str = "train") -> pd.DataFrame:
     Parameters
     ----------
     split : "train" | "test"
-
-    Returns
-    -------
-    pd.DataFrame with COLUMN_NAMES columns, no missing values, clean labels.
     """
     if split == "train":
         df = _load_raw_csv(RAW_TRAIN_CSV, skip_rows=0)
     elif split == "test":
-        df = _load_raw_csv(RAW_TEST_CSV, skip_rows=1)  # skip the comment line
+        df = _load_raw_csv(RAW_TEST_CSV, skip_rows=1)
     else:
         raise ValueError(f"split must be 'train' or 'test', got '{split}'")
 
@@ -243,7 +234,7 @@ def load_from_feature_store(split: str = "train") -> pd.DataFrame:
 
 
 # ---------------------------------------------------------------------------
-# Step 5 — Basic sanity checks after loading
+# Step 5 — Basic schema validation
 # ---------------------------------------------------------------------------
 
 
@@ -269,7 +260,7 @@ def validate_schema(df: pd.DataFrame) -> None:
 
 
 # ---------------------------------------------------------------------------
-# Entrypoint — run as script to download + prepare data
+# Entrypoint
 # ---------------------------------------------------------------------------
 
 
@@ -279,15 +270,12 @@ def run_ingestion_pipeline() -> None:
     log.info("Starting data ingestion pipeline")
     log.info("=" * 60)
 
-    # Download
     download_raw_data()
 
-    # Train split
     train_df = load_and_clean("train")
     validate_schema(train_df)
     save_to_feature_store(train_df, "train")
 
-    # Test split
     test_df = load_and_clean("test")
     validate_schema(test_df)
     save_to_feature_store(test_df, "test")

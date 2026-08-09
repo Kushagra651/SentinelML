@@ -30,7 +30,6 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
-# import numpy as np
 import pandas as pd
 
 log = logging.getLogger(__name__)
@@ -41,12 +40,19 @@ ARTIFACTS_DIR = Path(os.getenv("ARTIFACTS_DIR", "artifacts"))
 QUALITY_REPORTS_DIR = ARTIFACTS_DIR / "quality_reports"
 QUALITY_REPORTS_DIR.mkdir(parents=True, exist_ok=True)
 
-MISSING_WARN_PCT = float(os.getenv("MISSING_WARN_PCT", "0.05"))  # 5 %
-MISSING_CRITICAL_PCT = float(os.getenv("MISSING_CRITICAL_PCT", "0.15"))  # 15 %
-OOR_CRITICAL_PCT = float(os.getenv("OOR_CRITICAL_PCT", "0.10"))  # 10 %
-UNKNOWN_CAT_PCT = float(os.getenv("UNKNOWN_CAT_PCT", "0.05"))  # 5 %
+MISSING_WARN_PCT = float(os.getenv("MISSING_WARN_PCT", "0.05"))
+MISSING_CRITICAL_PCT = float(os.getenv("MISSING_CRITICAL_PCT", "0.15"))
+OOR_CRITICAL_PCT = float(os.getenv("OOR_CRITICAL_PCT", "0.10"))
+UNKNOWN_CAT_PCT = float(os.getenv("UNKNOWN_CAT_PCT", "0.05"))
 CONFIDENCE_LOW_WARN = float(os.getenv("CONFIDENCE_LOW_WARN", "0.55"))
-DUPLICATE_ID_HARD = True  # any duplicate request_id → hard fail
+
+# Log record columns to exclude when auto-detecting feature columns
+_LOG_META_COLS = {
+    "request_id", "prediction", "confidence", "model_version",
+    "model_alias", "timestamp", "ground_truth", "warnings",
+    "schema_version", "latency_ms", "probability_class_0",
+    "probability_class_1", "features",
+}
 
 
 # ── Data structures ───────────────────────────────────────────────────────────
@@ -55,7 +61,7 @@ DUPLICATE_ID_HARD = True  # any duplicate request_id → hard fail
 @dataclass
 class CheckResult:
     check_name: str
-    severity: str  # "hard" | "soft"
+    severity: str   # "hard" | "soft"
     passed: bool
     message: str
     details: Dict[str, Any] = field(default_factory=dict)
@@ -66,9 +72,9 @@ class FeatureQuality:
     feature: str
     missing_pct: float
     missing_count: int
-    oor_pct: Optional[float]  # numerical only
+    oor_pct: Optional[float]         # numerical only
     oor_count: Optional[int]
-    unknown_cat_pct: Optional[float]  # categorical only
+    unknown_cat_pct: Optional[float] # categorical only
     unknown_cat_count: Optional[int]
     quality_ok: bool
 
@@ -113,7 +119,9 @@ def _check_schema(df: pd.DataFrame, expected_columns: List[str]) -> CheckResult:
         severity="hard",
         passed=passed,
         message=(
-            "All expected columns present." if passed else f"Missing columns: {missing}"
+            "All expected columns present."
+            if passed
+            else f"Missing columns: {missing}"
         ),
         details={"missing_columns": missing},
     )
@@ -155,22 +163,24 @@ def _check_confidence(df: pd.DataFrame) -> CheckResult:
             if passed
             else f"Low mean confidence {mean_conf:.3f} < threshold {CONFIDENCE_LOW_WARN}."
         ),
-        details={
-            "mean_confidence": round(mean_conf, 4),
-            "threshold": CONFIDENCE_LOW_WARN,
-        },
+        details={"mean_confidence": round(mean_conf, 4), "threshold": CONFIDENCE_LOW_WARN},
     )
 
 
 def _check_prediction_coverage(
     df: pd.DataFrame,
-    known_classes: Optional[List[str]],
+    known_classes: Optional[List[int]],
 ) -> CheckResult:
-    if "predicted_class" not in df.columns or not known_classes:
+    """
+    Check for unexpected prediction values.
+    Uses 'prediction' column (int 0/1) from PredictionLog.
+    """
+    pred_col = "prediction"
+    if pred_col not in df.columns or not known_classes:
         return CheckResult(
             "prediction_coverage", "soft", True, "Skipped — no class list provided."
         )
-    seen = set(df["predicted_class"].unique())
+    seen = set(df[pred_col].unique())
     unknown = seen - set(known_classes)
     passed = len(unknown) == 0
     return CheckResult(
@@ -180,7 +190,7 @@ def _check_prediction_coverage(
         message=(
             "All predicted classes known."
             if passed
-            else f"Unknown classes in predictions: {unknown}"
+            else f"Unknown prediction values: {unknown}"
         ),
         details={"unknown_classes": list(unknown), "known_classes": known_classes},
     )
@@ -192,7 +202,7 @@ def _check_prediction_coverage(
 def _feature_quality(
     df: pd.DataFrame,
     feature: str,
-    ref_stats: Optional[Dict[str, Any]] = None,  # {"min": float, "max": float}
+    ref_stats: Optional[Dict[str, Any]] = None,
     known_categories: Optional[List[str]] = None,
 ) -> FeatureQuality:
     col = df[feature]
@@ -209,7 +219,6 @@ def _feature_quality(
             oor = int(((col < lo) | (col > hi)).sum())
             oor_count = oor
             oor_pct = round(oor / n, 4) if n > 0 else 0.0
-
     elif known_categories is not None:
         unknown = int((~col.isin(known_categories)).sum())
         unknown_cat_count = unknown
@@ -242,25 +251,27 @@ def _missing_rate_checks(
             continue
         rate = float(df[feat].isna().mean())
         if rate >= MISSING_CRITICAL_PCT:
-            results.append(
-                CheckResult(
-                    check_name=f"missing_rate_{feat}",
-                    severity="hard",
-                    passed=False,
-                    message=f"Feature '{feat}' missing rate {rate:.1%} ≥ critical threshold {MISSING_CRITICAL_PCT:.1%}.",
-                    details={"feature": feat, "missing_pct": round(rate, 4)},
-                )
-            )
+            results.append(CheckResult(
+                check_name=f"missing_rate_{feat}",
+                severity="hard",
+                passed=False,
+                message=(
+                    f"Feature '{feat}' missing rate {rate:.1%} ≥ "
+                    f"critical threshold {MISSING_CRITICAL_PCT:.1%}."
+                ),
+                details={"feature": feat, "missing_pct": round(rate, 4)},
+            ))
         elif rate >= MISSING_WARN_PCT:
-            results.append(
-                CheckResult(
-                    check_name=f"missing_rate_{feat}",
-                    severity="soft",
-                    passed=False,
-                    message=f"Feature '{feat}' missing rate {rate:.1%} ≥ warning threshold {MISSING_WARN_PCT:.1%}.",
-                    details={"feature": feat, "missing_pct": round(rate, 4)},
-                )
-            )
+            results.append(CheckResult(
+                check_name=f"missing_rate_{feat}",
+                severity="soft",
+                passed=False,
+                message=(
+                    f"Feature '{feat}' missing rate {rate:.1%} ≥ "
+                    f"warning threshold {MISSING_WARN_PCT:.1%}."
+                ),
+                details={"feature": feat, "missing_pct": round(rate, 4)},
+            ))
     return results
 
 
@@ -273,7 +284,7 @@ def compute_quality_report(
     expected_columns: Optional[List[str]] = None,
     ref_feature_stats: Optional[Dict[str, Dict[str, Any]]] = None,
     known_categories: Optional[Dict[str, List[str]]] = None,
-    known_classes: Optional[List[str]] = None,
+    known_classes: Optional[List[int]] = None,
     model_version: str = "unknown",
     window_start: Optional[str] = None,
     window_end: Optional[str] = None,
@@ -287,43 +298,28 @@ def compute_quality_report(
     expected_columns   : Hard schema check list
     ref_feature_stats  : {"feat": {"min": v, "max": v}} for OOR checks
     known_categories   : {"feat": ["cat1", "cat2"]} for categorical unknown checks
-    known_classes      : Expected predicted_class values
+    known_classes      : Expected prediction values (default [0, 1])
     save               : Persist JSON to QUALITY_REPORTS_DIR
     """
     ts = datetime.now(timezone.utc)
     report_id = f"quality_{ts.strftime('%Y%m%d_%H%M%S')}"
 
+    if known_classes is None:
+        known_classes = [0, 1]
+
     if feature_columns is None:
-        exclude = {
-            "request_id",
-            "predicted_class",
-            "confidence",
-            "model_version",
-            "timestamp",
-            "label",
-            "features",
-        }
-        feature_columns = [c for c in log_df.columns if c not in exclude]
+        feature_columns = [c for c in log_df.columns if c not in _LOG_META_COLS]
 
     checks: List[CheckResult] = []
 
-    # Schema check
     if expected_columns:
         checks.append(_check_schema(log_df, expected_columns))
 
-    # Duplicate IDs
     checks.append(_check_duplicates(log_df))
-
-    # Per-feature missing rates (generates per-feature CheckResults for failures only)
     checks.extend(_missing_rate_checks(log_df, feature_columns))
-
-    # Confidence sanity
     checks.append(_check_confidence(log_df))
-
-    # Prediction class coverage
     checks.append(_check_prediction_coverage(log_df, known_classes))
 
-    # Per-feature quality objects
     feature_quality: List[FeatureQuality] = []
     for feat in feature_columns:
         if feat not in log_df.columns:
@@ -331,19 +327,14 @@ def compute_quality_report(
         ref_stats = (ref_feature_stats or {}).get(feat)
         known_cats = (known_categories or {}).get(feat)
         try:
-            fq = _feature_quality(
-                log_df, feat, ref_stats=ref_stats, known_categories=known_cats
+            feature_quality.append(
+                _feature_quality(log_df, feat, ref_stats=ref_stats, known_categories=known_cats)
             )
-            feature_quality.append(fq)
         except Exception as e:
             log.error("FeatureQuality failed for '%s': %s", feat, e)
 
-    hard_failures = [
-        c.check_name for c in checks if not c.passed and c.severity == "hard"
-    ]
-    soft_warnings = [
-        c.check_name for c in checks if not c.passed and c.severity == "soft"
-    ]
+    hard_failures = [c.check_name for c in checks if not c.passed and c.severity == "hard"]
+    soft_warnings = [c.check_name for c in checks if not c.passed and c.severity == "soft"]
     overall_passed = len(hard_failures) == 0
 
     summary = {
@@ -375,15 +366,13 @@ def compute_quality_report(
 
     log.info(
         "Quality report %s | passed=%s | hard=%d soft=%d",
-        report_id,
-        overall_passed,
-        len(hard_failures),
-        len(soft_warnings),
+        report_id, overall_passed, len(hard_failures), len(soft_warnings),
     )
     return report
 
 
 def load_latest_quality_report() -> Optional[QualityReport]:
+    """Load most recent saved report (for DAG / exporter use)."""
     reports = sorted(QUALITY_REPORTS_DIR.glob("quality_report_*.json"), reverse=True)
     if not reports:
         return None

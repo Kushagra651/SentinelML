@@ -1,2 +1,9 @@
-/venv
+__pycache__/
+*.pyc
+*.pyo
 .env
+artifacts/models/*.pkl
+artifacts/models/*.json
+artifacts/models/*.log
+artifacts/production_model.json
+sentinelenv/

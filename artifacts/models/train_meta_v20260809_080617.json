@@ -1,0 +1,27 @@
+{
+  "version_tag": "20260809_080617",
+  "trained_at": "2026-08-09T08:06:22.414357",
+  "n_rows_ingested": 30162,
+  "n_rows_validated": 30162,
+  "n_train": 24129,
+  "n_val": 6033,
+  "n_features": 14,
+  "val_accuracy": 0.864081,
+  "train_duration_s": 4.412,
+  "hyperparameters": {
+    "n_estimators": 200,
+    "max_depth": 4,
+    "learning_rate": 0.05,
+    "subsample": 0.8,
+    "random_state": 42
+  },
+  "model_path": "/app/artifacts/models/model_v20260809_080617.pkl",
+  "pipeline_path": "/app/artifacts/models/pipeline_v20260809_080617.pkl",
+  "target_column": "income",
+  "random_seed": 42,
+  "soft_check_warnings": [
+    {
+      "message": "Found 23 fully-duplicate rows."
+    }
+  ]
+}

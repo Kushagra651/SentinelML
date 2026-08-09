@@ -1,25 +1,24 @@
 """
 airflow/dags/retrain_trigger_dag.py
-Polls drift_check_dag XCom for the `should_retrain` flag and conditionally
-triggers the training pipeline via Airflow's TriggerDagRunOperator.
 
-Schedule  : Every 6 hours, offset +30 min from drift_check (runs after it)
-            Configurable via RETRAIN_TRIGGER_SCHEDULE env-var.
+Reads the `drift_retrain_triggered` Airflow Variable set by drift_check_dag's
+gate task, then conditionally triggers ml_training_pipeline.
 
-Logic
-─────
-  1. poll_retrain_signal  — Read `severity_result` XCom from latest drift_check run
-  2. check_cooldown       — Skip if a retrain ran within RETRAIN_COOLDOWN_HOURS
-  3. branch               — route to trigger_training | skip_retrain
-  4. trigger_training     — Fire ml_training_pipeline DAG run
-  5. notify_retrain       — Alert team that a retrain was kicked off
-  6. update_cooldown      — Write cooldown timestamp to shared state file
+Schedule : 30 min after drift_check (RETRAIN_TRIGGER_SCHEDULE env, default: "30 */6 * * *")
 
-Guard rails
-───────────
-  - Cooldown window prevents retrain storms (default 12 h)
-  - Max retrain runs per day cap (RETRAIN_MAX_PER_DAY, default 2)
-  - Manual override: set FORCE_RETRAIN=true in Airflow Variable
+Guard rails:
+  - Cooldown: RETRAIN_COOLDOWN_HOURS (default 12h) between automated retrains
+  - Daily cap: RETRAIN_MAX_PER_DAY (default 2) triggered retrains per day
+  - Manual override: set Airflow Variable FORCE_RETRAIN=true
+
+Design notes:
+  - Reads the Airflow Variable written by drift_check_dag gate task, not XCom
+    from a specific task instance — simpler and more reliable across DAG runs.
+  - Cooldown timestamps stored in a JSON file under ARTIFACTS_DIR since Airflow
+    Variables have no TTL and DagRun.find() API differs across Airflow versions.
+  - All datetime comparisons use timezone-aware UTC datetimes to avoid TypeError
+    on naive vs aware subtraction.
+  - send_alert() uses severity= kwarg (not level=).
 """
 
 from __future__ import annotations
@@ -31,12 +30,11 @@ from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 from airflow import DAG
-from airflow.models import DagRun, Variable
-from airflow.operators.python import PythonOperator, BranchPythonOperator
+from airflow.models import Variable
 from airflow.operators.empty import EmptyOperator
+from airflow.operators.python import BranchPythonOperator, PythonOperator
 from airflow.operators.trigger_dagrun import TriggerDagRunOperator
 from airflow.utils.dates import days_ago
-from airflow.utils.state import DagRunState
 from airflow.utils.trigger_rule import TriggerRule
 
 log = logging.getLogger(__name__)
@@ -45,20 +43,19 @@ log = logging.getLogger(__name__)
 
 SCHEDULE = os.getenv("RETRAIN_TRIGGER_SCHEDULE", "30 */6 * * *")
 ARTIFACTS_DIR = os.getenv("ARTIFACTS_DIR", "artifacts")
-DRIFT_DAG_ID = "ml_drift_check"
 TRAINING_DAG_ID = "ml_training_pipeline"
 COOLDOWN_HOURS = int(os.getenv("RETRAIN_COOLDOWN_HOURS", "12"))
 MAX_PER_DAY = int(os.getenv("RETRAIN_MAX_PER_DAY", "2"))
 COOLDOWN_FILE = Path(ARTIFACTS_DIR) / "retrain_cooldown.json"
-FORCE_RETRAIN_VAR = "FORCE_RETRAIN"  # Airflow Variable name
+RETRAIN_VAR_KEY = "drift_retrain_triggered"
+FORCE_RETRAIN_VAR = "FORCE_RETRAIN"
 
 DEFAULT_ARGS = {
-    "owner": "ml-team",
+    "owner": "ml-platform",
     "depends_on_past": False,
     "retries": 1,
     "retry_delay": timedelta(minutes=5),
     "execution_timeout": timedelta(minutes=15),
-    "on_failure_callback": None,
 }
 
 
@@ -81,178 +78,119 @@ def _write_cooldown(state: dict) -> None:
         json.dump(state, f, indent=2)
 
 
-def _count_today_retrains() -> int:
-    """Count successful training DAG runs today via Airflow metadata DB."""
-    today = datetime.now(timezone.utc).date()
-    try:
-        runs = DagRun.find(
-            dag_id=TRAINING_DAG_ID,
-            state=DagRunState.SUCCESS,
-            execution_start_date=datetime.combine(today, datetime.min.time()).replace(
-                tzinfo=timezone.utc
-            ),
-        )
-        return len(runs) if runs else 0
-    except Exception as e:
-        log.warning("Could not query DagRun history: %s. Using cooldown file.", e)
-        state = _read_cooldown()
-        today_str = str(today)
-        if state.get("today_date") == today_str:
-            return state.get("runs_today", 0)
-        return 0
+def _runs_today(state: dict) -> int:
+    today = str(datetime.now(timezone.utc).date())
+    if state.get("today_date") == today:
+        return state.get("runs_today", 0)
+    return 0  # date rolled over — reset
 
 
 # ── Task callables ────────────────────────────────────────────────────────────
 
 
-def _poll_retrain_signal(**ctx) -> dict:
+def task_poll_signal(**ctx):
     """
-    Read severity_result XCom from the most recent drift_check DAG run.
-    Falls back to FORCE_RETRAIN Airflow Variable for manual override.
+    Reads the drift_retrain_triggered Variable set by drift_check_dag.
+    Also checks FORCE_RETRAIN Variable for manual overrides.
+    Pushes a signal dict to XCom.
     """
-    # Check manual override first
     force = False
     try:
-        force_val = Variable.get(FORCE_RETRAIN_VAR, default_var="false")
-        force = str(force_val).lower() == "true"
+        force = Variable.get(FORCE_RETRAIN_VAR, default_var="false").lower() == "true"
         if force:
-            log.warning("FORCE_RETRAIN Variable is set — overriding drift signal.")
+            log.warning("FORCE_RETRAIN=true — overriding drift signal.")
     except Exception:
         pass
 
-    signal = {
-        "should_retrain": force,
-        "severity": "forced" if force else "ok",
-        "source": "manual_override" if force else "drift_check",
-    }
-
-    if not force:
-        # Fetch latest drift_check DAG run XCom
+    if force:
+        signal = {"should_retrain": True, "source": "manual_override"}
+    else:
         try:
-            latest_runs = DagRun.find(dag_id=DRIFT_DAG_ID, state=DagRunState.SUCCESS)
-            if latest_runs:
-                latest_run = max(latest_runs, key=lambda r: r.execution_date)
-                from airflow.models import TaskInstance
-
-                tis = TaskInstance.find(
-                    dag_id=DRIFT_DAG_ID,
-                    run_id=latest_run.run_id,
-                    task_id="evaluate_severity",
-                )
-                if tis:
-                    severity_result = (
-                        tis[0].xcom_pull(
-                            task_ids="evaluate_severity",
-                            key="severity_result",
-                            dag_id=DRIFT_DAG_ID,
-                            include_prior_dates=False,
-                        )
-                        or {}
-                    )
-                    signal = {
-                        "should_retrain": severity_result.get("should_retrain", False),
-                        "severity": severity_result.get("severity", "ok"),
-                        "drift_report_id": severity_result.get("drift_report_id"),
-                        "quality_report_id": severity_result.get("quality_report_id"),
-                        "source": "drift_check_xcom",
-                    }
+            val = Variable.get(RETRAIN_VAR_KEY, default_var="false")
+            should_retrain = val.lower() == "true"
         except Exception as e:
-            log.error("XCom poll failed: %s — defaulting to no retrain.", e)
+            log.error("Could not read %s Variable: %s. Defaulting to false.", RETRAIN_VAR_KEY, e)
+            should_retrain = False
+        signal = {"should_retrain": should_retrain, "source": "drift_check_variable"}
 
-    ctx["ti"].xcom_push(key="retrain_signal", value=signal)
-    log.info(
-        "Retrain signal: should_retrain=%s severity=%s source=%s",
-        signal["should_retrain"],
-        signal["severity"],
-        signal["source"],
-    )
-    return signal
+    ctx["ti"].xcom_push(key="signal", value=signal)
+    log.info("Retrain signal: %s", signal)
 
 
-def _check_cooldown(**ctx) -> dict:
+def task_check_cooldown(**ctx):
     """
-    Apply guard rails:
-      - Cooldown window (COOLDOWN_HOURS since last retrain)
-      - Max runs per day (MAX_PER_DAY)
-    Pushes `approved` bool.
+    Applies cooldown + daily cap guard rails.
+    Pushes approved=True/False to XCom.
     """
-    signal = ctx["ti"].xcom_pull(key="retrain_signal") or {}
+    ti = ctx["ti"]
+    signal = ti.xcom_pull(task_ids="poll_signal", key="signal") or {}
 
     if not signal.get("should_retrain"):
-        ctx["ti"].xcom_push(
-            key="cooldown_result", value={"approved": False, "reason": "no_signal"}
-        )
-        return {"approved": False, "reason": "no_signal"}
+        ti.xcom_push(key="cooldown", value={"approved": False, "reason": "no_signal"})
+        return
 
     state = _read_cooldown()
     now = datetime.now(timezone.utc)
 
-    # Cooldown check
+    # Cooldown window check
     if state.get("last_retrain_utc"):
-        last = datetime.fromisoformat(state["last_retrain_utc"])
+        last_str = state["last_retrain_utc"]
+        last = datetime.fromisoformat(last_str)
+        # Ensure timezone-aware for safe subtraction
+        if last.tzinfo is None:
+            last = last.replace(tzinfo=timezone.utc)
         elapsed_h = (now - last).total_seconds() / 3600
         if elapsed_h < COOLDOWN_HOURS:
-            reason = f"cooldown ({elapsed_h:.1f}h < {COOLDOWN_HOURS}h required)"
+            reason = f"cooldown ({elapsed_h:.1f}h elapsed, need {COOLDOWN_HOURS}h)"
             log.info("Retrain suppressed: %s", reason)
-            ctx["ti"].xcom_push(
-                key="cooldown_result", value={"approved": False, "reason": reason}
-            )
-            return {"approved": False, "reason": reason}
+            ti.xcom_push(key="cooldown", value={"approved": False, "reason": reason})
+            return
 
-    # Daily cap check
-    today_count = _count_today_retrains()
+    # Daily cap check (from cooldown file — simple, no DagRun query needed)
+    today_count = _runs_today(state)
     if today_count >= MAX_PER_DAY:
-        reason = f"daily_cap ({today_count}/{MAX_PER_DAY} runs today)"
+        reason = f"daily_cap ({today_count}/{MAX_PER_DAY} retrains today)"
         log.info("Retrain suppressed: %s", reason)
-        ctx["ti"].xcom_push(
-            key="cooldown_result", value={"approved": False, "reason": reason}
-        )
-        return {"approved": False, "reason": reason}
+        ti.xcom_push(key="cooldown", value={"approved": False, "reason": reason})
+        return
 
-    ctx["ti"].xcom_push(
-        key="cooldown_result", value={"approved": True, "reason": "cleared"}
-    )
-    log.info("Retrain approved. Today's count: %d/%d", today_count, MAX_PER_DAY)
-    return {"approved": True, "reason": "cleared"}
+    log.info("Retrain approved. today_count=%d/%d", today_count, MAX_PER_DAY)
+    ti.xcom_push(key="cooldown", value={"approved": True, "reason": "cleared"})
 
 
-def _branch_retrain(**ctx) -> str:
-    cooldown = ctx["ti"].xcom_pull(key="cooldown_result") or {}
+def task_branch(**ctx):
+    cooldown = ctx["ti"].xcom_pull(task_ids="check_cooldown", key="cooldown") or {}
     return "trigger_training" if cooldown.get("approved") else "skip_retrain"
 
 
-def _notify_retrain_triggered(**ctx) -> None:
-    """Alert team that an automated retrain was kicked off."""
-    from alerting.notify import send_alert
+def task_notify_triggered(**ctx):
+    """Sends Slack alert that an automated retrain was kicked off."""
+    try:
+        from alerting.notify import send_alert  # noqa: PLC0415
 
-    signal = ctx["ti"].xcom_pull(key="retrain_signal") or {}
-    cooldown = ctx["ti"].xcom_pull(key="cooldown_result") or {}
+        ti = ctx["ti"]
+        signal = ti.xcom_pull(task_ids="poll_signal", key="signal") or {}
 
-    send_alert(
-        level="warning",
-        title="[Retrain Trigger] Automated retrain initiated",
-        message=(
-            f"Drift severity: {signal.get('severity', 'unknown')}\n"
-            f"Drift report: {signal.get('drift_report_id', 'n/a')}\n"
-            f"Quality report: {signal.get('quality_report_id', 'n/a')}\n"
-            f"Cooldown status: {cooldown.get('reason', 'n/a')}\n"
-            f"Training DAG: {TRAINING_DAG_ID} has been triggered."
-        ),
-        tags={
-            "source": signal.get("source", "unknown"),
-            "severity": signal.get("severity", "unknown"),
-        },
-    )
-    log.info("Retrain notification sent.")
+        send_alert(
+            channel="slack",
+            title="[RETRAIN TRIGGER] Automated retrain initiated",
+            message=(
+                f"Source: {signal.get('source', 'unknown')}\n"
+                f"Training DAG `{TRAINING_DAG_ID}` has been triggered."
+            ),
+            severity="warning",
+            labels={"dag": "ml_retrain_trigger", "ds": ctx["ds"]},
+        )
+    except Exception as e:
+        log.error("Retrain notification failed: %s", e)
 
 
-def _update_cooldown(**ctx) -> None:
-    """Write updated cooldown state after successful trigger."""
+def task_update_cooldown(**ctx):
+    """Writes updated cooldown state after a successful retrain trigger."""
     now = datetime.now(timezone.utc)
     today = str(now.date())
     state = _read_cooldown()
 
-    # Reset daily counter if date rolled over
     if state.get("today_date") != today:
         state["runs_today"] = 0
         state["today_date"] = today
@@ -261,132 +199,83 @@ def _update_cooldown(**ctx) -> None:
     state["runs_today"] = state.get("runs_today", 0) + 1
     _write_cooldown(state)
     log.info(
-        "Cooldown updated: last=%s runs_today=%d", now.isoformat(), state["runs_today"]
+        "Cooldown updated: last=%s  runs_today=%d",
+        now.isoformat(), state["runs_today"],
     )
 
 
-def _log_skip(**ctx) -> None:
-    cooldown = ctx["ti"].xcom_pull(key="cooldown_result") or {}
-    signal = ctx["ti"].xcom_pull(key="retrain_signal") or {}
+def task_clear_force_var(**ctx):
+    """Resets FORCE_RETRAIN Variable so it doesn't trigger indefinitely."""
+    try:
+        Variable.set(FORCE_RETRAIN_VAR, "false")
+        log.info("FORCE_RETRAIN Variable reset to false.")
+    except Exception as e:
+        log.warning("Could not reset %s Variable: %s", FORCE_RETRAIN_VAR, e)
+
+
+def task_skip_retrain(**ctx):
+    cooldown = ctx["ti"].xcom_pull(task_ids="check_cooldown", key="cooldown") or {}
+    signal = ctx["ti"].xcom_pull(task_ids="poll_signal", key="signal") or {}
     log.info(
-        "Retrain skipped. should_retrain=%s reason=%s",
+        "Retrain skipped. should_retrain=%s  reason=%s",
         signal.get("should_retrain"),
         cooldown.get("reason"),
     )
 
 
-def _clear_force_retrain_var(**ctx) -> None:
-    """Reset FORCE_RETRAIN variable if it was set, after retrain triggered."""
+def _on_failure(context):
     try:
-        Variable.set(FORCE_RETRAIN_VAR, "false")
-    except Exception as e:
-        log.warning("Could not reset %s Variable: %s", FORCE_RETRAIN_VAR, e)
+        from alerting.notify import send_alert  # noqa: PLC0415
 
-
-def _notify_failure(context) -> None:
-    try:
-        from alerting.notify import send_alert
-
-        dag_id = context["dag"].dag_id
-        task_id = context["task_instance"].task_id
+        ti = context["task_instance"]
         send_alert(
-            level="critical",
-            title=f"[{dag_id}] Task '{task_id}' failed",
+            channel="slack",
+            title=f"[RETRAIN TRIGGER FAIL] {ti.task_id}",
             message=str(context.get("exception", "unknown")),
-            tags={"dag": dag_id, "task": task_id},
+            severity="critical",
+            labels={"dag": "ml_retrain_trigger", "task": ti.task_id},
         )
     except Exception as e:
-        log.error("Failure alert error: %s", e)
-
-
-DEFAULT_ARGS["on_failure_callback"] = _notify_failure
+        log.error("Failure alert send failed: %s", e)
 
 
 # ── DAG ───────────────────────────────────────────────────────────────────────
 
 with DAG(
     dag_id="ml_retrain_trigger",
-    description="Polls drift_check XCom and conditionally triggers ml_training_pipeline",
+    description="Reads drift signal and conditionally triggers ml_training_pipeline",
     schedule_interval=SCHEDULE,
     start_date=days_ago(1),
-    default_args=DEFAULT_ARGS,
     catchup=False,
     max_active_runs=1,
     tags=["ml", "retrain", "trigger"],
-    doc_md=f"""
-## ML Retrain Trigger DAG
-
-Runs 30 min after drift_check. Reads its `severity_result` XCom output
-and triggers `{TRAINING_DAG_ID}` if retraining is warranted.
-
-### Guard rails
-- **Cooldown**: {COOLDOWN_HOURS} hours between automated retrains
-- **Daily cap**: max {MAX_PER_DAY} triggered retrains per day
-- **Manual override**: Set Airflow Variable `{FORCE_RETRAIN_VAR}=true`
-
-### Steps
-1. **poll_retrain_signal** — Read XCom from latest drift_check run
-2. **check_cooldown**      — Apply cooldown + daily cap guards
-3. **branch_retrain**      — Route to trigger or skip
-4. **trigger_training**    — Fire ml_training_pipeline DAG run
-5. **notify_retrain**      — Alert team
-6. **update_cooldown**     — Write new cooldown state
-""",
+    default_args={**DEFAULT_ARGS, "on_failure_callback": _on_failure},
+    doc_md=__doc__,
 ) as dag:
 
-    poll_signal = PythonOperator(
-        task_id="poll_retrain_signal",
-        python_callable=_poll_retrain_signal,
-    )
+    t_poll = PythonOperator(task_id="poll_signal", python_callable=task_poll_signal)
+    t_cooldown = PythonOperator(task_id="check_cooldown", python_callable=task_check_cooldown)
+    t_branch = BranchPythonOperator(task_id="branch", python_callable=task_branch)
 
-    check_cooldown = PythonOperator(
-        task_id="check_cooldown",
-        python_callable=_check_cooldown,
-    )
-
-    branch = BranchPythonOperator(
-        task_id="branch_retrain",
-        python_callable=_branch_retrain,
-    )
-
-    trigger_training = TriggerDagRunOperator(
+    t_trigger = TriggerDagRunOperator(
         task_id="trigger_training",
         trigger_dag_id=TRAINING_DAG_ID,
-        wait_for_completion=False,  # fire-and-forget; training DAG is long-running
+        wait_for_completion=False,
         reset_dag_run=False,
-        conf={
-            "triggered_by": "ml_retrain_trigger",
-            "reason": "automated_drift_retrain",
-        },
+        conf={"triggered_by": "ml_retrain_trigger", "reason": "drift_or_quality_failure"},
     )
 
-    notify_triggered = PythonOperator(
-        task_id="notify_retrain_triggered",
-        python_callable=_notify_retrain_triggered,
-    )
+    t_notify = PythonOperator(task_id="notify_triggered", python_callable=task_notify_triggered)
+    t_update_cd = PythonOperator(task_id="update_cooldown", python_callable=task_update_cooldown)
+    t_clear = PythonOperator(task_id="clear_force_var", python_callable=task_clear_force_var)
+    t_skip = PythonOperator(task_id="skip_retrain", python_callable=task_skip_retrain)
 
-    update_cooldown = PythonOperator(
-        task_id="update_cooldown",
-        python_callable=_update_cooldown,
-    )
-
-    clear_force_var = PythonOperator(
-        task_id="clear_force_retrain_var",
-        python_callable=_clear_force_retrain_var,
-    )
-
-    skip_retrain = PythonOperator(
-        task_id="skip_retrain",
-        python_callable=_log_skip,
-    )
-
-    done = EmptyOperator(
+    t_done = EmptyOperator(
         task_id="done",
         trigger_rule=TriggerRule.NONE_FAILED_MIN_ONE_SUCCESS,
     )
 
-    # Pipeline
-    poll_signal >> check_cooldown >> branch
-    branch >> [trigger_training, skip_retrain]
-    trigger_training >> notify_triggered >> update_cooldown >> clear_force_var >> done
-    skip_retrain >> done
+    t_poll >> t_cooldown >> t_branch
+    t_branch >> [t_trigger, t_skip]
+    t_trigger >> t_notify >> t_update_cd >> t_clear >> t_done
+    t_skip >> t_done

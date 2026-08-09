@@ -5,26 +5,24 @@ Simulates realistic data drift scenarios for testing the monitoring pipeline.
 
 Drift types supported
 ---------------------
-1.  Covariate drift      – input feature distribution shifts (gradual / sudden)
-2.  Label drift          – target class distribution shifts
-3.  Concept drift        – relationship between features and label changes
-4.  Missing value drift  – sudden spike in nulls for specific columns
-5.  Schema drift         – unexpected new / dropped / renamed columns
-6.  Categorical drift    – new unseen category labels appear
-7.  Temporal drift       – timestamp gaps / out-of-order events
+1. Covariate drift     — input feature distribution shifts (gradual / sudden)
+2. Label drift         — target class distribution shifts
+3. Concept drift       — relationship between features and label changes
+4. Missing value drift — sudden spike in nulls for specific columns
+5. Schema drift        — unexpected new / dropped / renamed columns
+6. Categorical drift   — new unseen category labels appear
+7. Temporal drift      — no-op for UCI Adult (no timestamp column); kept for API compatibility
 
 Each injector is a pure function:
     inject_*(df, **params) -> pd.DataFrame
 
-A high-level ``inject_drift`` dispatcher accepts a ``DriftConfig`` dataclass
+A high-level inject_drift dispatcher accepts a DriftConfig dataclass
 so Airflow DAGs and tests can drive injection declaratively.
 """
 
 from __future__ import annotations
 
 import logging
-
-# import random
 from dataclasses import dataclass, field
 from enum import Enum
 from typing import Any, Optional
@@ -47,7 +45,7 @@ class DriftType(str, Enum):
     SCHEMA = "schema"
     CATEGORICAL = "categorical"
     TEMPORAL = "temporal"
-    NONE = "none"  # pass-through (useful in A/B tests)
+    NONE = "none"
 
 
 @dataclass
@@ -64,8 +62,7 @@ class DriftConfig:
     affected_columns:
         Columns to target. Empty list = injector picks sensible defaults.
     gradual:
-        If True, drift is applied progressively across rows (simulates
-        concept / covariate drift that worsens over time).
+        If True, drift is applied progressively across rows.
     seed:
         Random seed for reproducibility.
     extra:
@@ -73,7 +70,7 @@ class DriftConfig:
     """
 
     drift_type: DriftType = DriftType.NONE
-    intensity: float = 0.3  # fraction of rows / magnitude
+    intensity: float = 0.3
     affected_columns: list[str] = field(default_factory=list)
     gradual: bool = False
     seed: int = 42
@@ -81,13 +78,31 @@ class DriftConfig:
 
 
 # ---------------------------------------------------------------------------
-# Default column sets (fallbacks when affected_columns is empty)
+# Default column sets — UCI Adult Income dataset
 # ---------------------------------------------------------------------------
 
-_DEFAULT_NUMERIC_COLS = ["amount", "age", "credit_score", "num_transactions_30d"]
-_DEFAULT_CAT_COLS = ["currency", "channel", "account_type"]
-_LABEL_COL = "label"
-_TIMESTAMP_COL = "timestamp"
+_DEFAULT_NUMERIC_COLS = [
+    "age",
+    "fnlwgt",
+    "education_num",
+    "capital_gain",
+    "capital_loss",
+    "hours_per_week",
+]
+
+_DEFAULT_CAT_COLS = [
+    "workclass",
+    "education",
+    "marital_status",
+    "occupation",
+    "relationship",
+    "race",
+    "sex",
+    "native_country",
+]
+
+_LABEL_COL = "income"  # UCI Adult target column: ">50K" / "<=50K"
+_TIMESTAMP_COL = "timestamp"  # UCI Adult has no timestamp — kept for API compatibility
 
 
 # ---------------------------------------------------------------------------
@@ -106,14 +121,14 @@ def inject_covariate_drift(
     """
     Shift numeric feature distributions by adding scaled noise / bias.
 
-    ``intensity`` controls the magnitude of the shift as a fraction of each
+    intensity controls the magnitude of the shift as a fraction of each
     column's standard deviation (e.g. 0.3 → shift mean by 0.3 * std).
     """
     rng = np.random.default_rng(seed)
     df = df.copy()
     cols = affected_columns or [c for c in _DEFAULT_NUMERIC_COLS if c in df.columns]
-
     n = len(df)
+
     for col in cols:
         if col not in df.columns:
             logger.warning("Covariate drift: column '%s' not found, skipping.", col)
@@ -127,12 +142,10 @@ def inject_covariate_drift(
         shift = intensity * std
 
         if gradual:
-            # Drift increases linearly from 0 → shift over the batch
             progressive_shift = np.linspace(0, shift, n)
             noise = rng.normal(loc=0, scale=std * 0.05, size=n)
             df[col] = series + progressive_shift + noise
         else:
-            # Sudden shift applied to a random subset of rows
             n_affected = max(1, int(n * intensity))
             idx = rng.choice(n, size=n_affected, replace=False)
             noise = rng.normal(loc=shift, scale=std * 0.1, size=n_affected)
@@ -140,9 +153,7 @@ def inject_covariate_drift(
 
         logger.debug(
             "Covariate drift injected into '%s' | shift=%.4f | gradual=%s",
-            col,
-            shift,
-            gradual,
+            col, shift, gradual,
         )
 
     return df
@@ -161,9 +172,10 @@ def inject_label_drift(
     seed: int = 42,
 ) -> pd.DataFrame:
     """
-    Flip a fraction of labels to simulate class distribution shift.
+    Flip a fraction of income labels to simulate class distribution shift.
 
-    ``target_positive_rate`` overrides ``intensity`` when provided.
+    For UCI Adult: positive class is ">50K", negative is "<=50K".
+    target_positive_rate overrides intensity when provided.
     """
     rng = np.random.default_rng(seed)
     df = df.copy()
@@ -174,33 +186,30 @@ def inject_label_drift(
 
     labels = df[_LABEL_COL].copy()
     n = len(labels)
+    pos_label, neg_label = ">50K", "<=50K"
 
     if target_positive_rate is not None:
-        # Force the positive rate to the target value
-        current_pos = labels.sum()
+        current_pos = (labels == pos_label).sum()
         desired_pos = int(target_positive_rate * n)
         delta = desired_pos - current_pos
 
         if delta > 0:
-            # Need more positives — flip negatives → positive
-            neg_idx = labels[labels == 0].index.tolist()
+            neg_idx = labels[labels == neg_label].index.tolist()
             flip_idx = rng.choice(neg_idx, size=min(delta, len(neg_idx)), replace=False)
-            labels.loc[flip_idx] = 1
+            labels.loc[flip_idx] = pos_label
         elif delta < 0:
-            # Need fewer positives — flip positives → negative
-            pos_idx = labels[labels == 1].index.tolist()
-            flip_idx = rng.choice(
-                pos_idx, size=min(-delta, len(pos_idx)), replace=False
-            )
-            labels.loc[flip_idx] = 0
+            pos_idx = labels[labels == pos_label].index.tolist()
+            flip_idx = rng.choice(pos_idx, size=min(-delta, len(pos_idx)), replace=False)
+            labels.loc[flip_idx] = neg_label
     else:
-        # Randomly flip ``intensity`` fraction of labels
         n_flip = max(1, int(n * intensity))
         flip_idx = rng.choice(n, size=n_flip, replace=False)
-        labels.iloc[flip_idx] = 1 - labels.iloc[flip_idx]
+        labels.iloc[flip_idx] = labels.iloc[flip_idx].map(
+            {pos_label: neg_label, neg_label: pos_label}
+        )
 
     df[_LABEL_COL] = labels
-    new_rate = df[_LABEL_COL].mean()
+    new_rate = (df[_LABEL_COL] == pos_label).mean()
     logger.debug("Label drift injected. New positive rate=%.4f", new_rate)
     return df
 
@@ -218,11 +227,8 @@ def inject_concept_drift(
     seed: int = 42,
 ) -> pd.DataFrame:
     """
-    Break the feature→label relationship by re-assigning labels for a subset
-    of rows based on a *different* decision boundary.
-
-    Simulates the real-world scenario where the same feature values now mean
-    something different (e.g. fraud patterns evolve).
+    Break the feature→label relationship by re-assigning income labels for a
+    subset of rows based on a different decision boundary.
     """
     rng = np.random.default_rng(seed)
     df = df.copy()
@@ -232,9 +238,9 @@ def inject_concept_drift(
         return df
 
     n = len(df)
+    pos_label, neg_label = ">50K", "<=50K"
 
     if gradual:
-        # Probability of label flip increases linearly across the batch
         flip_prob = np.linspace(0, intensity, n)
         flip_mask = rng.random(n) < flip_prob
     else:
@@ -242,13 +248,15 @@ def inject_concept_drift(
         flip_mask = np.zeros(n, dtype=bool)
         flip_mask[rng.choice(n, size=n_affected, replace=False)] = True
 
-    df.loc[flip_mask, _LABEL_COL] = 1 - df.loc[flip_mask, _LABEL_COL]
+    df.loc[flip_mask, _LABEL_COL] = df.loc[flip_mask, _LABEL_COL].map(
+        {pos_label: neg_label, neg_label: pos_label}
+    )
 
-    # Also add mild covariate noise to the same rows to make it realistic
+    # Add mild covariate noise to the same rows
     for col in [c for c in _DEFAULT_NUMERIC_COLS if c in df.columns]:
         series = pd.to_numeric(df[col], errors="coerce")
         std = series.std(skipna=True) or 1.0
-        noise = rng.normal(0, std * 0.2 * intensity, size=flip_mask.sum())
+        noise = rng.normal(0, std * 0.2 * intensity, size=int(flip_mask.sum()))
         df.loc[flip_mask, col] = series[flip_mask].values + noise
 
     logger.debug("Concept drift injected. Rows affected: %d / %d", flip_mask.sum(), n)
@@ -269,7 +277,7 @@ def inject_missing_value_drift(
 ) -> pd.DataFrame:
     """
     Introduce NaN values into specified columns.
-    ``intensity`` is the fraction of rows that will have nulls introduced.
+    intensity is the fraction of rows that will have nulls introduced.
     """
     rng = np.random.default_rng(seed)
     df = df.copy()
@@ -302,15 +310,6 @@ def inject_schema_drift(
 ) -> pd.DataFrame:
     """
     Simulate schema changes: drop columns, add new ones, rename existing ones.
-
-    Parameters
-    ----------
-    drop_columns:
-        Column names to remove entirely.
-    add_columns:
-        ``{new_col_name: fill_value}`` — new columns with constant or callable fill.
-    rename_columns:
-        ``{old_name: new_name}`` mapping.
     """
     rng = np.random.default_rng(seed)
     df = df.copy()
@@ -322,10 +321,7 @@ def inject_schema_drift(
 
     if add_columns:
         for col, fill in add_columns.items():
-            if callable(fill):
-                df[col] = fill(len(df), rng)
-            else:
-                df[col] = fill
+            df[col] = fill(len(df), rng) if callable(fill) else fill
             logger.debug("Schema drift: added column '%s'.", col)
 
     if rename_columns:
@@ -351,9 +347,7 @@ def inject_categorical_drift(
 ) -> pd.DataFrame:
     """
     Introduce unseen category labels into categorical columns.
-
-    ``new_categories`` maps column names to lists of new (unseen) labels.
-    Defaults to generic ``"unknown_<col>_<i>"`` labels if not provided.
+    Defaults to generic unknown_<col>_<i> labels if new_categories not provided.
     """
     rng = np.random.default_rng(seed)
     df = df.copy()
@@ -363,8 +357,6 @@ def inject_categorical_drift(
     for col in cols:
         if col not in df.columns:
             continue
-
-        # Determine new labels to inject
         new_labels = (new_categories or {}).get(
             col, [f"unknown_{col}_0", f"unknown_{col}_1"]
         )
@@ -374,16 +366,14 @@ def inject_categorical_drift(
         df.iloc[idx, df.columns.get_loc(col)] = chosen_labels
         logger.debug(
             "Categorical drift: %d rows in '%s' set to unseen labels %s.",
-            n_affected,
-            col,
-            new_labels,
+            n_affected, col, new_labels,
         )
 
     return df
 
 
 # ---------------------------------------------------------------------------
-# 7. Temporal drift
+# 7. Temporal drift — no-op for UCI Adult (no timestamp column)
 # ---------------------------------------------------------------------------
 
 
@@ -395,35 +385,32 @@ def inject_temporal_drift(
     seed: int = 42,
 ) -> pd.DataFrame:
     """
-    Introduce temporal anomalies:
-    - A sudden gap (``gap_hours``) inserted after the midpoint of the batch.
-    - A fraction of timestamps shuffled to simulate out-of-order events.
+    Introduce temporal anomalies. UCI Adult Income has no timestamp column,
+    so this is a no-op that logs a warning and returns the DataFrame unchanged.
+    Kept for API compatibility with the DriftConfig dispatcher.
     """
+    if _TIMESTAMP_COL not in df.columns:
+        logger.warning(
+            "Temporal drift: '%s' column not found in DataFrame (expected for UCI Adult). "
+            "Returning DataFrame unchanged.",
+            _TIMESTAMP_COL,
+        )
+        return df.copy()
+
     rng = np.random.default_rng(seed)
     df = df.copy()
-
-    if _TIMESTAMP_COL not in df.columns:
-        logger.warning("Temporal drift: '%s' not found. Skipping.", _TIMESTAMP_COL)
-        return df
-
     ts = pd.to_datetime(df[_TIMESTAMP_COL], utc=True, errors="coerce")
     n = len(ts)
     midpoint = n // 2
 
-    # Insert time gap after midpoint
     gap = pd.Timedelta(hours=gap_hours)
     ts.iloc[midpoint:] = ts.iloc[midpoint:] + gap
-    logger.debug(
-        "Temporal drift: gap of %.1fh inserted at row %d.", gap_hours, midpoint
-    )
 
-    # Shuffle a fraction of timestamps (out-of-order)
     n_shuffle = max(1, int(n * out_of_order_fraction))
     idx = rng.choice(n, size=n_shuffle, replace=False)
     shuffled_vals = ts.iloc[idx].values.copy()
     rng.shuffle(shuffled_vals)
     ts.iloc[idx] = shuffled_vals
-    logger.debug("Temporal drift: %d timestamps shuffled (out-of-order).", n_shuffle)
 
     df[_TIMESTAMP_COL] = ts
     return df
@@ -436,26 +423,11 @@ def inject_temporal_drift(
 
 def inject_drift(df: pd.DataFrame, config: DriftConfig) -> pd.DataFrame:
     """
-    Central dispatcher — routes to the correct injector based on ``config.drift_type``.
-
-    Parameters
-    ----------
-    df:
-        Input DataFrame (will not be mutated).
-    config:
-        ``DriftConfig`` describing what drift to apply.
-
-    Returns
-    -------
-    pd.DataFrame
-        New DataFrame with drift injected.
+    Central dispatcher — routes to the correct injector based on config.drift_type.
     """
     logger.info(
         "Injecting drift | type=%s | intensity=%.2f | gradual=%s | seed=%d",
-        config.drift_type,
-        config.intensity,
-        config.gradual,
-        config.seed,
+        config.drift_type, config.intensity, config.gradual, config.seed,
     )
 
     kwargs: dict[str, Any] = dict(
@@ -519,7 +491,7 @@ def inject_drift(df: pd.DataFrame, config: DriftConfig) -> pd.DataFrame:
 
 
 # ---------------------------------------------------------------------------
-# Composite injector  (used by Airflow DAGs to chain multiple drift types)
+# Composite injector
 # ---------------------------------------------------------------------------
 
 
@@ -528,19 +500,8 @@ def inject_composite_drift(
     configs: list[DriftConfig],
 ) -> pd.DataFrame:
     """
-    Apply multiple drift injections sequentially.
-
-    Parameters
-    ----------
-    df:
-        Input DataFrame.
-    configs:
-        Ordered list of ``DriftConfig`` objects. Applied left-to-right.
-
-    Returns
-    -------
-    pd.DataFrame
-        DataFrame with all drift types applied in order.
+    Apply multiple drift injections sequentially (left-to-right).
+    Used by Airflow DAGs to chain multiple drift types in one run.
     """
     for cfg in configs:
         df = inject_drift(df, cfg)

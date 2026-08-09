@@ -5,18 +5,21 @@ Model loading, hot-reload detection, and prediction engine.
 
 Responsibilities
 ----------------
-- Read artifacts/models/production_model.json to locate the current prod model
-- Load latest_model.pkl (GBM) and latest_pipeline.pkl (FeaturePipeline) at startup
+- Read artifacts/production_model.json to locate the current production model
+- Load model_v<tag>.pkl (GBM) and pipeline_v<tag>.pkl (FeaturePipeline) at startup
 - Detect when production_model.json has been updated and hot-reload without restart
-- Validate incoming feature dicts against FeatureSchema (columns + dtypes)
+- Validate incoming feature dicts against the 14 known UCI Adult Income columns
 - Run pipeline.transform → model.predict / predict_proba
 - Return a structured PredictionResult with prediction, probabilities, latency, model version
 
 Public API
 ----------
     predict(features: dict) -> PredictionResult
+    predict_batch(records: list[dict]) -> list[PredictionResult]
     get_model_info()        -> dict
-    reload_if_stale()       -> bool          # called by main.py on each request
+    reload_if_stale()       -> bool   # called by main.py on each request
+    force_reload()          -> None   # admin endpoint / tests
+    _ensure_loaded()        -> _ModelBundle
 """
 
 from __future__ import annotations
@@ -31,32 +34,42 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
-# import numpy as np
 import pandas as pd
 
 # ---------------------------------------------------------------------------
 # Paths — override via environment variables for Docker / tests
 # ---------------------------------------------------------------------------
-ARTIFACTS_DIR = Path(os.getenv("ARTIFACTS_DIR", "artifacts/models"))
+ARTIFACTS_DIR = Path(os.getenv("ARTIFACTS_DIR", "artifacts"))
 REGISTRY_FILE = ARTIFACTS_DIR / "production_model.json"
-MODEL_SYMLINK = ARTIFACTS_DIR / "latest_model.pkl"
-PIPELINE_SYMLINK = ARTIFACTS_DIR / "latest_pipeline.pkl"
+
+# ---------------------------------------------------------------------------
+# Known feature columns — UCI Adult Income, 14 features
+# Source of truth: project_context.md + api/schemas.py
+# ---------------------------------------------------------------------------
+NUMERICAL_FEATURES = [
+    "age",
+    "fnlwgt",
+    "education_num",
+    "capital_gain",
+    "capital_loss",
+    "hours_per_week",
+]
+CATEGORICAL_FEATURES = [
+    "workclass",
+    "education",
+    "marital_status",
+    "occupation",
+    "relationship",
+    "race",
+    "sex",
+    "native_country",
+]
+ALL_FEATURES: list[str] = NUMERICAL_FEATURES + CATEGORICAL_FEATURES
 
 # ---------------------------------------------------------------------------
 # Logging
 # ---------------------------------------------------------------------------
 logger = logging.getLogger(__name__)
-
-# ---------------------------------------------------------------------------
-# Schemas import — graceful fallback so predict.py is testable in isolation
-# ---------------------------------------------------------------------------
-try:
-    from api.schemas import FeatureSchema  # type: ignore
-
-    _SCHEMA_AVAILABLE = True
-except ImportError:  # pragma: no cover
-    _SCHEMA_AVAILABLE = False
-    logger.warning("api.schemas not importable — dtype validation will be skipped")
 
 
 # ---------------------------------------------------------------------------
@@ -68,10 +81,10 @@ except ImportError:  # pragma: no cover
 class PredictionResult:
     """Structured return value from predict()."""
 
-    prediction: int  # 0 or 1 (binary classification)
+    prediction: int  # 0 (<=50K) or 1 (>50K)
     probability_class_0: float
     probability_class_1: float
-    confidence: float  # max(probabilities)
+    confidence: float  # max(probability_class_0, probability_class_1)
     model_version: str
     model_alias: str  # e.g. "production"
     latency_ms: float
@@ -107,7 +120,7 @@ class _ModelBundle:
 
 
 # ---------------------------------------------------------------------------
-# Module-level state (singleton pattern; thread-safe via RLock)
+# Module-level state — thread-safe via RLock
 # ---------------------------------------------------------------------------
 _bundle: _ModelBundle | None = None
 _lock = threading.RLock()
@@ -139,31 +152,32 @@ def _load_pickle(path: Path) -> Any:
 
 def _load_bundle() -> _ModelBundle:
     """
-    Read production_model.json, resolve symlinks, and load model + pipeline.
-    Returns a fresh _ModelBundle.
+    Read production_model.json, resolve artifact paths, and load model + pipeline.
+
+    production_model.json shape (written by register_model.py):
+    {
+      "version":       "v20260418_220902",
+      "alias":         "production",
+      "model_path":    "/app/artifacts/models/model_v20260418_220902.pkl",
+      "pipeline_path": "/app/artifacts/models/pipeline_v20260418_220902.pkl",
+      "status":        "production",
+      "val_accuracy":  0.863252,
+      ...
+    }
     """
     registry = _read_registry()
 
-    # production_model.json shape (written by register_model.py):
-    # {
-    #   "version": "v20240101_120000",
-    #   "alias":   "production",
-    #   "model_path":    "artifacts/models/model_v....pkl",
-    #   "pipeline_path": "artifacts/models/pipeline_v....pkl",
-    #   ...
-    # }
     version = registry.get("version", "unknown")
     alias = registry.get("alias", "production")
 
-    # Prefer explicit paths from registry; fall back to symlinks
-    model_path = (
-        Path(registry["model_path"]) if "model_path" in registry else MODEL_SYMLINK
-    )
-    pipeline_path = (
-        Path(registry["pipeline_path"])
-        if "pipeline_path" in registry
-        else PIPELINE_SYMLINK
-    )
+    if "model_path" not in registry or "pipeline_path" not in registry:
+        raise KeyError(
+            "production_model.json is missing 'model_path' or 'pipeline_path'. "
+            "Re-run register_model.py."
+        )
+
+    model_path = Path(registry["model_path"])
+    pipeline_path = Path(registry["pipeline_path"])
 
     logger.info("Loading model bundle version=%s from %s", version, model_path)
     model = _load_pickle(model_path)
@@ -180,11 +194,11 @@ def _load_bundle() -> _ModelBundle:
 
 
 def _ensure_loaded() -> _ModelBundle:
-    """Return the current bundle, loading it if this is the first call."""
+    """Return the current bundle, loading it on the first call (double-checked locking)."""
     global _bundle
     if _bundle is None:
         with _lock:
-            if _bundle is None:  # double-checked locking
+            if _bundle is None:
                 _bundle = _load_bundle()
     return _bundle
 
@@ -218,8 +232,7 @@ def reload_if_stale() -> bool:
         current_mtime,
     )
     with _lock:
-        # Re-check inside lock; another thread may have beaten us here
-        if current_mtime > _bundle.registry_mtime:
+        if current_mtime > _bundle.registry_mtime:  # re-check inside lock
             try:
                 new_bundle = _load_bundle()
                 _bundle = new_bundle
@@ -231,7 +244,7 @@ def reload_if_stale() -> bool:
 
 
 def force_reload() -> None:
-    """Unconditionally reload the model bundle (used in tests / admin endpoints)."""
+    """Unconditionally reload the model bundle (used by admin endpoint / tests)."""
     global _bundle
     with _lock:
         _bundle = _load_bundle()
@@ -239,51 +252,45 @@ def force_reload() -> None:
 
 
 # ---------------------------------------------------------------------------
-# Input validation helpers
+# Input validation
 # ---------------------------------------------------------------------------
 
 
 def _validate_features(features: dict, warnings: list[str]) -> pd.DataFrame:
     """
-    1. Check all expected columns are present (uses FeatureSchema if available).
-    2. Cast to expected dtypes where safe.
-    3. Warn (don't raise) on unknown extra columns — they are dropped silently.
+    Validate and normalise a raw feature dict before pipeline.transform().
 
-    Returns a single-row DataFrame ready for pipeline.transform().
+    Checks:
+    - All 14 expected columns are present (raises ValueError on missing)
+    - Unknown extra columns are dropped with a warning
+    - Numerical columns are cast to float64; categorical remain as object
+
+    Returns a single-row DataFrame ready for FeaturePipeline.transform().
     """
-    if _SCHEMA_AVAILABLE:
-        schema: FeatureSchema = FeatureSchema()
-        expected_cols: list[str] = schema.feature_columns  # e.g. ["age", "income", ...]
-        dtype_map: dict[str, str] = schema.feature_dtypes  # e.g. {"age": "int64", ...}
+    missing = [col for col in ALL_FEATURES if col not in features]
+    if missing:
+        raise ValueError(f"Missing required feature columns: {missing}")
 
-        missing = [c for c in expected_cols if c not in features]
-        if missing:
-            raise ValueError(f"Missing required feature columns: {missing}")
+    extra = [col for col in features if col not in ALL_FEATURES]
+    if extra:
+        warnings.append(f"Ignoring unknown columns: {extra}")
 
-        extra = [c for c in features if c not in expected_cols]
-        if extra:
-            warnings.append(f"Ignoring unknown columns: {extra}")
-            features = {k: v for k, v in features.items() if k in expected_cols}
+    # Build ordered dict with only the 14 known features
+    filtered = {col: features[col] for col in ALL_FEATURES}
+    df = pd.DataFrame([filtered])
 
-        df = pd.DataFrame([features])
-
-        # Safe dtype casting
-        for col, dtype in dtype_map.items():
-            if col in df.columns:
-                try:
-                    df[col] = df[col].astype(dtype)
-                except (ValueError, TypeError) as exc:
-                    warnings.append(f"Could not cast '{col}' to {dtype}: {exc}")
-    else:
-        # No schema available — pass through as-is
-        df = pd.DataFrame([features])
-        warnings.append("FeatureSchema unavailable — skipping column/dtype validation")
+    # Safe dtype casting for numericals
+    for col in NUMERICAL_FEATURES:
+        try:
+            df[col] = df[col].astype("float64")
+        except (ValueError, TypeError) as exc:
+            warnings.append(f"Could not cast '{col}' to float64: {exc}")
 
     return df
 
 
 # ---------------------------------------------------------------------------
-# Public: predict
+# Public: single prediction
 # ---------------------------------------------------------------------------
 
 
@@ -294,24 +301,24 @@ def predict(features: dict) -> PredictionResult:
     Parameters
     ----------
     features : dict
-        Raw feature key-value pairs, e.g. {"age": 34, "income": 55000, ...}
+        Raw feature key-value pairs matching the 14 UCI Adult Income columns.
 
     Returns
     -------
     PredictionResult
-        Prediction, probabilities, confidence, model metadata, latency.
+        Prediction (0/1), probabilities, confidence, model metadata, latency.
 
     Raises
     ------
     ValueError
         If required feature columns are missing.
     RuntimeError
-        If the model artifact cannot be loaded.
+        If the model artifact cannot be loaded or inference fails.
     """
     t_start = time.perf_counter()
     warnings_list: list[str] = []
 
-    # 1. Ensure model is loaded (hot-reload handled separately by main.py)
+    # 1. Ensure model is loaded
     try:
         bundle = _ensure_loaded()
     except Exception as exc:
@@ -329,6 +336,7 @@ def predict(features: dict) -> PredictionResult:
 
     # 4. Inference
     try:
+        # GBM trained on UCI Adult returns string labels ">50K" / "<=50K"
         raw_prediction = bundle.model.predict(X)[0]
         if isinstance(raw_prediction, str):
             prediction = 1 if raw_prediction.strip() == ">50K" else 0
@@ -336,15 +344,13 @@ def predict(features: dict) -> PredictionResult:
             prediction = int(raw_prediction)
 
         if hasattr(bundle.model, "predict_proba"):
-            proba = bundle.model.predict_proba(X)[0]  # shape (n_classes,)
-            # Normalise to exactly 2 classes; handle multi-class gracefully
+            proba = bundle.model.predict_proba(X)[0]
             if len(proba) >= 2:
                 prob_0, prob_1 = float(proba[0]), float(proba[1])
             else:
                 prob_1 = float(proba[0])
                 prob_0 = 1.0 - prob_1
         else:
-            # Model has no predict_proba (e.g. LinearSVC) — use hard decision
             prob_1 = 1.0 if prediction == 1 else 0.0
             prob_0 = 1.0 - prob_1
             warnings_list.append(
@@ -354,8 +360,7 @@ def predict(features: dict) -> PredictionResult:
     except Exception as exc:
         raise RuntimeError(f"Model inference failed: {exc}") from exc
 
-    t_end = time.perf_counter()
-    latency_ms = (t_end - t_start) * 1000.0
+    latency_ms = (time.perf_counter() - t_start) * 1000.0
 
     return PredictionResult(
         prediction=prediction,
@@ -371,16 +376,47 @@ def predict(features: dict) -> PredictionResult:
 
 
 # ---------------------------------------------------------------------------
-# Public: model info (used by /health and /model-info endpoints in main.py)
+# Public: batch prediction
+# ---------------------------------------------------------------------------
+
+
+def predict_batch(records: list[dict]) -> list[PredictionResult]:
+    """
+    Run predict() on a list of feature dicts.
+    Errors on individual records are caught and surfaced as warnings rather
+    than aborting the entire batch.
+    """
+    results = []
+    for i, rec in enumerate(records):
+        try:
+            results.append(predict(rec))
+        except Exception as exc:  # noqa: BLE001
+            logger.error("predict_batch: record %d failed — %s", i, exc)
+            results.append(
+                PredictionResult(
+                    prediction=-1,
+                    probability_class_0=0.0,
+                    probability_class_1=0.0,
+                    confidence=0.0,
+                    model_version=_bundle.version if _bundle else "unknown",
+                    model_alias="error",
+                    latency_ms=0.0,
+                    warnings=[f"Inference error on record {i}: {exc}"],
+                )
+            )
+    return results
+
+
+# ---------------------------------------------------------------------------
+# Public: model info
 # ---------------------------------------------------------------------------
 
 
 def get_model_info() -> dict:
     """
     Return metadata about the currently loaded model bundle.
-    Safe to call even if no model is loaded yet (returns status: unloaded).
+    Safe to call even if no model is loaded (returns status: unloaded).
     """
-    global _bundle
     if _bundle is None:
         return {"status": "unloaded", "version": None, "alias": None}
 
@@ -397,39 +433,6 @@ def get_model_info() -> dict:
 
 
 # ---------------------------------------------------------------------------
-# Batch prediction convenience (used by drift_report.py, evaluate.py)
-# ---------------------------------------------------------------------------
-
-
-def predict_batch(records: list[dict]) -> list[PredictionResult]:
-    """
-    Run predict() on a list of feature dicts.
-    Errors on individual records are caught and surfaced as warnings rather
-    than aborting the entire batch.
-    """
-    results = []
-    for i, rec in enumerate(records):
-        try:
-            results.append(predict(rec))
-        except Exception as exc:  # noqa: BLE001
-            logger.error("predict_batch: record %d failed — %s", i, exc)
-            # Append a sentinel result so the caller gets a list of the same length
-            results.append(
-                PredictionResult(
-                    prediction=-1,
-                    probability_class_0=0.0,
-                    probability_class_1=0.0,
-                    confidence=0.0,
-                    model_version=_bundle.version if _bundle else "unknown",
-                    model_alias="error",
-                    latency_ms=0.0,
-                    warnings=[f"Inference error: {exc}"],
-                )
-            )
-    return results
-
-
-# ---------------------------------------------------------------------------
 # Module self-test (python -m api.predict)
 # ---------------------------------------------------------------------------
 
@@ -439,25 +442,14 @@ if __name__ == "__main__":
     logging.basicConfig(level=logging.INFO, format="%(levelname)s | %(message)s")
 
     try:
-        info = get_model_info()
-        logger.info("Pre-load info: %s", info)
-
-        # Attempt to load — will fail if artifacts don't exist yet
+        logger.info("Pre-load info: %s", get_model_info())
         bundle = _ensure_loaded()
         logger.info("Bundle loaded: version=%s alias=%s", bundle.version, bundle.alias)
-
-        stale = reload_if_stale()
-        logger.info("reload_if_stale() returned: %s", stale)
-
-        logger.info(
-            "Model info: %s", json.dumps(get_model_info(), indent=2, default=str)
-        )
+        logger.info("reload_if_stale() → %s", reload_if_stale())
+        logger.info("Model info: %s", json.dumps(get_model_info(), indent=2, default=str))
         logger.info("predict.py self-test passed.")
         sys.exit(0)
-
     except FileNotFoundError as exc:
         logger.warning("Artifacts not present yet (expected during dev): %s", exc)
-        logger.info(
-            "predict.py import structure OK — run training pipeline to generate artifacts."
-        )
+        logger.info("Import structure OK — run training pipeline to generate artifacts.")
         sys.exit(0)

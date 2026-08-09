@@ -1,0 +1,265 @@
+{
+  "version_tag": "20260809_080617",
+  "evaluated_at": "2026-08-09T08:08:53.783492+00:00",
+  "promote": false,
+  "metrics": {
+    "accuracy": 0.866733,
+    "precision": 0.784538,
+    "recall": 0.630811,
+    "f1": 0.699326,
+    "roc_auc": 0.921158,
+    "brier_score": 0.092987,
+    "n_samples": 15060,
+    "n_positive": 3700,
+    "n_negative": 11360,
+    "positive_rate": 0.2457,
+    "decision_threshold": 0.5
+  },
+  "confusion_matrix": {
+    "raw": [
+      [
+        10719,
+        641
+      ],
+      [
+        1366,
+        2334
+      ]
+    ],
+    "normalized": [
+      [
+        0.9436,
+        0.0564
+      ],
+      [
+        0.3692,
+        0.6308
+      ]
+    ],
+    "true_negatives": 10719,
+    "false_positives": 641,
+    "false_negatives": 1366,
+    "true_positives": 2334,
+    "false_positive_rate": 0.056426,
+    "false_negative_rate": 0.369189
+  },
+  "per_class_report": {
+    "0": {
+      "precision": 0.8869673148531237,
+      "recall": 0.9435739436619718,
+      "f1-score": 0.9143953934740883,
+      "support": 11360.0
+    },
+    "1": {
+      "precision": 0.7845378151260505,
+      "recall": 0.6308108108108108,
+      "f1-score": 0.6993258426966292,
+      "support": 3700.0
+    },
+    "accuracy": 0.8667330677290837,
+    "macro avg": {
+      "precision": 0.8357525649895872,
+      "recall": 0.7871923772363913,
+      "f1-score": 0.8068606180853588,
+      "support": 15060.0
+    },
+    "weighted avg": {
+      "precision": 0.8618020327156622,
+      "recall": 0.8667330677290837,
+      "f1-score": 0.8615562608129594,
+      "support": 15060.0
+    }
+  },
+  "threshold_analysis": [
+    {
+      "threshold": 0.1,
+      "precision": 0.4789,
+      "recall": 0.9489,
+      "f1": 0.6365,
+      "n_predicted_positive": 7332
+    },
+    {
+      "threshold": 0.2,
+      "precision": 0.5739,
+      "recall": 0.8846,
+      "f1": 0.6962,
+      "n_predicted_positive": 5703
+    },
+    {
+      "threshold": 0.3,
+      "precision": 0.6488,
+      "recall": 0.8043,
+      "f1": 0.7182,
+      "n_predicted_positive": 4587
+    },
+    {
+      "threshold": 0.4,
+      "precision": 0.7168,
+      "recall": 0.7189,
+      "f1": 0.7179,
+      "n_predicted_positive": 3711
+    },
+    {
+      "threshold": 0.5,
+      "precision": 0.7845,
+      "recall": 0.6308,
+      "f1": 0.6993,
+      "n_predicted_positive": 2975
+    },
+    {
+      "threshold": 0.6,
+      "precision": 0.8376,
+      "recall": 0.5492,
+      "f1": 0.6634,
+      "n_predicted_positive": 2426
+    },
+    {
+      "threshold": 0.7,
+      "precision": 0.8869,
+      "recall": 0.46,
+      "f1": 0.6058,
+      "n_predicted_positive": 1919
+    },
+    {
+      "threshold": 0.8,
+      "precision": 0.9444,
+      "recall": 0.3492,
+      "f1": 0.5099,
+      "n_predicted_positive": 1368
+    },
+    {
+      "threshold": 0.9,
+      "precision": 0.9934,
+      "recall": 0.243,
+      "f1": 0.3904,
+      "n_predicted_positive": 905
+    }
+  ],
+  "feature_importances": [
+    {
+      "rank": 1,
+      "feature": "relationship",
+      "importance": 0.33912
+    },
+    {
+      "rank": 2,
+      "feature": "capital_gain",
+      "importance": 0.207641
+    },
+    {
+      "rank": 3,
+      "feature": "education_num",
+      "importance": 0.200197
+    },
+    {
+      "rank": 4,
+      "feature": "age",
+      "importance": 0.06477
+    },
+    {
+      "rank": 5,
+      "feature": "capital_loss",
+      "importance": 0.061382
+    },
+    {
+      "rank": 6,
+      "feature": "hours_per_week",
+      "importance": 0.04435
+    },
+    {
+      "rank": 7,
+      "feature": "occupation",
+      "importance": 0.026512
+    },
+    {
+      "rank": 8,
+      "feature": "marital_status",
+      "importance": 0.021752
+    },
+    {
+      "rank": 9,
+      "feature": "fnlwgt",
+      "importance": 0.013226
+    },
+    {
+      "rank": 10,
+      "feature": "workclass",
+      "importance": 0.009991
+    },
+    {
+      "rank": 11,
+      "feature": "sex",
+      "importance": 0.005033
+    },
+    {
+      "rank": 12,
+      "feature": "native_country",
+      "importance": 0.003069
+    },
+    {
+      "rank": 13,
+      "feature": "education",
+      "importance": 0.00148
+    },
+    {
+      "rank": 14,
+      "feature": "race",
+      "importance": 0.001477
+    }
+  ],
+  "calibration": {
+    "expected_calibration_error": 0.007838,
+    "n_bins": 10,
+    "mean_predicted_value": [
+      0.0317,
+      0.1449,
+      0.247,
+      0.3486,
+      0.4484,
+      0.5492,
+      0.6519,
+      0.7482,
+      0.8469,
+      0.968
+    ],
+    "fraction_of_positives": [
+      0.0245,
+      0.1461,
+      0.2661,
+      0.3607,
+      0.4429,
+      0.5501,
+      0.6509,
+      0.7441,
+      0.8488,
+      0.9934
+    ],
+    "calibration_quality": "good"
+  },
+  "promotion_gate": {
+    "thresholds_used": {
+      "accuracy": 0.75,
+      "f1": 0.7,
+      "roc_auc": 0.75
+    },
+    "checks": {
+      "accuracy": true,
+      "f1": false,
+      "roc_auc": true
+    },
+    "promote": false
+  },
+  "training_context": {
+    "n_train": 24129,
+    "n_val": 6033,
+    "val_accuracy": 0.864081,
+    "hyperparameters": {
+      "n_estimators": 200,
+      "max_depth": 4,
+      "learning_rate": 0.05,
+      "subsample": 0.8,
+      "random_state": 42
+    },
+    "trained_at": "2026-08-09T08:06:22.414357"
+  }
+}

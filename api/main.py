@@ -5,52 +5,39 @@ Matched exactly to actual public APIs:
   api/predict.py : predict(), reload_if_stale(), force_reload(), get_model_info(), PredictionResult
   api/logger.py  : log_prediction_from_result(), flush(), shutdown(), query_logs()
   api/metrics.py : record_prediction_from_result(), record_error(), to_prometheus_text(), get_snapshot()
-  api/schemas.py : PredictionInput, PredictionOutput, PredictionLog, HealthResponse
+  api/schemas.py : PredictionInput, PredictionOutput, HealthResponse
 """
 
 from __future__ import annotations
 
 import logging
 import time
+import uuid
 from contextlib import asynccontextmanager
-from datetime import datetime, timezone, timedelta
+from datetime import datetime, timedelta, timezone
+from fastapi.responses import StreamingResponse
+from agent.graph import run_agent, stream_agent
+from agent.query_logger import log_query
 
 from fastapi import FastAPI, HTTPException, Request, Response
 from fastapi.middleware.cors import CORSMiddleware
 
-# predict.py — module-level functions
 import api.predict as predictor_module
 from api.predict import (
-    predict,
-    reload_if_stale,
+    PredictionResult,
     force_reload,
     get_model_info,
-    PredictionResult,
+    predict,
+    reload_if_stale,
 )
-
-# logger.py — module-level functions
-from api.logger import (
-    log_prediction_from_result,
-    flush,
-    shutdown,
-    query_logs,
-)
-
-# metrics.py — module-level functions
+from api.logger import flush, log_prediction_from_result, query_logs, shutdown
 from api.metrics import (
-    record_prediction_from_result,
-    record_error,
-    to_prometheus_text,
     get_snapshot,
+    record_error,
+    record_prediction_from_result,
+    to_prometheus_text,
 )
-
-# schemas.py — Pydantic models
-from api.schemas import (
-    PredictionInput,
-    PredictionOutput,
-    # PredictionLog,
-    HealthResponse,
-)
+from api.schemas import HealthResponse, PredictionInput, PredictionOutput
 
 log = logging.getLogger(__name__)
 _START_TIME = time.time()
@@ -106,7 +93,7 @@ async def track_latency(request: Request, call_next):
     response: Response = await call_next(request)
     latency_ms = (time.perf_counter() - start) * 1000
     if request.url.path == "/predict":
-        reload_if_stale()  # cheap stat() check on every predict request
+        reload_if_stale()
     response.headers["X-Latency-Ms"] = f"{latency_ms:.2f}"
     return response
 
@@ -119,8 +106,9 @@ def health():
     info = get_model_info()
     return HealthResponse(
         status="ok",
-        model_version=info.get("version") or "unknown",
-        model_stage=info.get("alias") or "unknown",
+        model_loaded=info.get("status") == "loaded",
+        model_version=info.get("version"),
+        model_alias=info.get("alias"),
         uptime_seconds=round(time.time() - _START_TIME, 1),
     )
 
@@ -138,10 +126,8 @@ def ready():
 
 @app.post("/predict", response_model=PredictionOutput, tags=["inference"])
 def predict_endpoint(req: PredictionInput):
-    # t_start = time.perf_counter()
-
-    # Validated Pydantic model → plain dict for predict()
     features = req.model_dump()
+    request_id = str(uuid.uuid4())
 
     try:
         result: PredictionResult = predict(features)
@@ -150,26 +136,26 @@ def predict_endpoint(req: PredictionInput):
         log.error("Prediction failed: %s", e)
         raise HTTPException(status_code=500, detail=str(e))
 
-    # latency_ms = (time.perf_counter() - t_start) * 1000
-
-    # result.prediction is int 0/1 — map to label strings schema expects
-    predicted_label = ">50K" if result.prediction == 1 else "<=50K"
-
     output = PredictionOutput(
-        predicted_label=predicted_label,
-        probability_above_50k=result.probability_class_1,
+        prediction=result.prediction,
+        probability_class_0=result.probability_class_0,
+        probability_class_1=result.probability_class_1,
+        confidence=result.confidence,
         model_version=result.model_version,
+        model_alias=result.model_alias,
+        latency_ms=result.latency_ms,
+        features_used=result.features_used,
+        warnings=result.warnings,
+        request_id=request_id,
     )
 
-    # Track metrics using module-level function
     record_prediction_from_result(result)
 
-    # Log full record asynchronously (never blocks the response)
     try:
         log_prediction_from_result(
             features=features,
             result=result,
-            request_id=str(output.prediction_id),
+            request_id=request_id,
         )
     except Exception as e:
         log.warning("Prediction log enqueue failed (non-fatal): %s", e)
@@ -177,7 +163,7 @@ def predict_endpoint(req: PredictionInput):
     return output
 
 
-# ── Ops ───────────────────────────────────────────────────────────────────────
+# ── Model ops ─────────────────────────────────────────────────────────────────
 
 
 @app.post("/model/reload", tags=["ops"])
@@ -213,16 +199,12 @@ def prometheus_metrics():
 @app.get("/metrics/summary", tags=["monitoring"])
 def metrics_summary():
     """Human-readable metrics snapshot."""
-    snapshot = get_snapshot()
-    return snapshot.__dict__ if hasattr(snapshot, "__dict__") else str(snapshot)
+    return get_snapshot().to_dict()
 
 
 @app.get("/logs", tags=["monitoring"])
 def get_logs(hours: int = 1, limit: int = 100):
-    """
-    Time-windowed prediction log retrieval.
-    Returns last `hours` hours of predictions (default 1h).
-    """
+    """Time-windowed prediction log retrieval."""
     now = datetime.now(timezone.utc)
     start = now - timedelta(hours=hours)
     try:
@@ -232,3 +214,33 @@ def get_logs(hours: int = 1, limit: int = 100):
     except Exception as e:
         log.error("query_logs failed: %s", e)
         return {"count": 0, "logs": [], "error": str(e)}
+
+
+@app.post("/agent/query")
+async def agent_query(body: dict):
+    import time
+    question = body.get("question", "").strip()
+    if not question:
+        raise HTTPException(status_code=400, detail="question is required")
+
+    stream = body.get("stream", False)
+
+    if stream:
+        return StreamingResponse(
+            stream_agent(question),
+            media_type="text/event-stream",
+        )
+
+    t0 = time.perf_counter()
+    answer = run_agent(question)
+    latency = (time.perf_counter() - t0) * 1000
+
+    model_info = get_model_info()
+    log_query(
+        question=question,
+        answer=answer,
+        latency_ms=round(latency, 2),
+        model_version=model_info.get("version_tag"),
+    )
+
+    return {"question": question, "answer": answer, "latency_ms": round(latency, 2)}
