@@ -107,7 +107,9 @@ jobs:
         run: pip install -r requirements.txt pytest pytest-cov pytest-asyncio httpx
 
       - name: Apply DB schema
-        run: PGPASSWORD=testpassword psql -h localhost -U mluser -d ml_monitoring_test -f init_db.sql
+        run: |
+          PGPASSWORD=testpassword psql -h localhost -U mluser -d ml_monitoring_test -c "CREATE DATABASE airflow;" || true
+          PGPASSWORD=testpassword psql -h localhost -U mluser -d ml_monitoring_test -f init_db.sql
 
       - name: Create artifacts dir
         run: mkdir -p /tmp/ml_artifacts/models /tmp/ml_artifacts/drift_reports /tmp/ml_artifacts/quality_reports /tmp/ml_artifacts/logs
