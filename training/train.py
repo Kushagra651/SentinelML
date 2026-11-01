@@ -36,6 +36,11 @@ from data.ingest import load_from_feature_store, run_ingestion_pipeline
 from data.validate import validate_dataframe
 from data.features import build_features, FeaturePipeline
 
+try:
+    from experiments.mlflow_utils import log_run
+except Exception:
+    log_run = None  # type: ignore[assignment]
+
 # =============================================================================
 # LOGGING
 # =============================================================================
@@ -231,6 +236,21 @@ def run_training(
         val_accuracy,
     )
     logger.info("=" * 60)
+
+    if log_run is not None:
+        log_run(
+            experiment_name="sentinelml-training",
+            run_name=f"train_v{version_tag}",
+            params={
+                **params,
+                "n_train": len(y_train),
+                "n_val": len(y_val),
+                "n_features": X.shape[1],
+            },
+            metrics={"val_accuracy": val_accuracy, "train_duration_s": train_duration},
+            artifacts=[model_path, pipeline_path, meta_path],
+            tags={"version_tag": version_tag, "stage": "train"},
+        )
 
     return {
         "version_tag": version_tag,

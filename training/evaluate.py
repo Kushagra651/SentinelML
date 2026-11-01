@@ -40,6 +40,11 @@ from data.ingest import load_from_feature_store
 from data.validate import validate_dataframe
 from data.features import FeaturePipeline, build_features
 
+try:
+    from experiments.mlflow_utils import log_run
+except Exception:
+    log_run = None  # type: ignore[assignment]
+
 # =============================================================================
 # LOGGING
 # =============================================================================
@@ -339,6 +344,21 @@ def evaluate(version_tag: str, test_data_source: Optional[str] = None) -> dict:
         promotion_gate["promote"],
     )
     logger.info("=" * 60)
+    if log_run is not None:
+        log_run(
+            experiment_name="sentinelml-training",
+            run_name=f"eval_v{version_tag}",
+            params={"decision_threshold": DECISION_THRESHOLD},
+            metrics={
+                "accuracy": core_metrics["accuracy"],
+                "f1": core_metrics["f1"],
+                "roc_auc": core_metrics["roc_auc"],
+                "brier_score": core_metrics["brier_score"],
+                "promote": float(promotion_gate["promote"]),
+            },
+            artifacts=[report_path],
+            tags={"version_tag": version_tag, "stage": "evaluate"},
+        )
 
     return report_dict
 
