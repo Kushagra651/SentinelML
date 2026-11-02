@@ -1,0 +1,14 @@
+FROM python:3.11-slim
+
+# Slow/flaky network tolerant: long timeout, many retries, wheels cached across builds.
+ENV PIP_DEFAULT_TIMEOUT=300 \
+    PIP_RETRIES=10 \
+    PIP_DISABLE_PIP_VERSION_CHECK=1
+
+# Server + Postgres driver. mlflow version MUST match the mlflow-skinny client pin.
+# sqlalchemy/alembic pinned to versions MLflow 2.16.x was built against
+# (unpinned pip resolves SQLAlchemy 2.1.x, which is newer than that release supports).
+RUN --mount=type=cache,target=/root/.cache/pip \
+    pip install mlflow==2.16.2 psycopg2-binary==2.9.9 "sqlalchemy==2.0.30" "alembic<1.14"
+
+EXPOSE 5000

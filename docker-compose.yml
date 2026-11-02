@@ -1,5 +1,3 @@
-version: "3.9"
-
 # ── Shared network ────────────────────────────────────────────────────────────
 networks:
   ml_net:
@@ -12,6 +10,7 @@ volumes:
   grafana_data:
   prometheus_data:
   artifacts_data:
+  mlflow_artifacts:
 
 # ── Common Airflow env (shared by webserver + scheduler) ──────────────────────
 x-airflow-common: &airflow-common
@@ -34,6 +33,7 @@ x-airflow-common: &airflow-common
     POSTGRES_DB: ${POSTGRES_DB}
     POSTGRES_USER: ${POSTGRES_USER}
     POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+    DATABASE_URL: postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@ml_postgres:5432/${POSTGRES_DB}
     TARGET_COLUMN: income
     SLACK_WEBHOOK_URL: ${SLACK_WEBHOOK_URL:-}
     PAGERDUTY_ROUTING_KEY: ${PAGERDUTY_ROUTING_KEY:-}
@@ -41,6 +41,7 @@ x-airflow-common: &airflow-common
     DRIFT_CHECK_SCHEDULE: ${DRIFT_CHECK_SCHEDULE:-0 */6 * * *}
     RETRAIN_TRIGGER_SCHEDULE: ${RETRAIN_TRIGGER_SCHEDULE:-30 */6 * * *}
     RETRAIN_COOLDOWN_HOURS: ${RETRAIN_COOLDOWN_HOURS:-12}
+    MLFLOW_TRACKING_URI: ${MLFLOW_TRACKING_URI:-http://ml_mlflow:5000}
   volumes:
     - artifacts_data:/app/artifacts
   networks:
@@ -71,10 +72,12 @@ services:
       POSTGRES_DB: ${POSTGRES_DB}
       POSTGRES_USER: ${POSTGRES_USER}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      DATABASE_URL: postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@ml_postgres:5432/${POSTGRES_DB}
       LOG_LEVEL: ${LOG_LEVEL:-info}
       SLACK_WEBHOOK_URL: ${SLACK_WEBHOOK_URL:-}
       GROQ_API_KEY: ${GROQ_API_KEY}
       AGENT_API_BASE: http://ml_api:8000
+      MLFLOW_TRACKING_URI: ${MLFLOW_TRACKING_URI:-http://ml_mlflow:5000}
     volumes:
       - artifacts_data:/app/artifacts
     networks:
@@ -110,6 +113,37 @@ services:
       interval: 10s
       timeout: 5s
       retries: 5
+
+  # ── MLflow tracking server (experiment tracking only; JSON registry serves) ─
+  ml_mlflow:
+    build:
+      context: ./dockerfiles
+      dockerfile: Dockerfile.mlflow
+    container_name: ml_mlflow
+    restart: unless-stopped
+    ports:
+      - "5000:5000"
+    command:
+      - mlflow
+      - server
+      - --host=0.0.0.0
+      - --port=5000
+      - --backend-store-uri=postgresql+psycopg2://${POSTGRES_USER}:${POSTGRES_PASSWORD}@ml_postgres:5432/mlflow
+      - --artifacts-destination=/mlflow/artifacts
+      - --serve-artifacts
+    volumes:
+      - mlflow_artifacts:/mlflow/artifacts
+    networks:
+      - ml_net
+    depends_on:
+      ml_postgres:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:5000/health')"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 20s
 
   # ── Prometheus ─────────────────────────────────────────────────────────────
   ml_prometheus:

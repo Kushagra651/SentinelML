@@ -3,10 +3,16 @@ FROM python:3.11-slim AS builder
 
 WORKDIR /build
 
+# Flaky-network tolerant: long timeout, many retries, wheel cache kept across builds.
+# (pip self-upgrade removed: it was an extra download that could fail the whole build.)
+ENV PIP_DEFAULT_TIMEOUT=300 \
+    PIP_RETRIES=10 \
+    PIP_DISABLE_PIP_VERSION_CHECK=1
+
 # Install build deps separately so this layer is cached unless requirements change
 COPY requirements.txt .
-RUN pip install --upgrade pip && \
-    pip install --no-cache-dir --prefix=/install -r requirements.txt
+RUN --mount=type=cache,target=/root/.cache/pip \
+    pip install --prefix=/install -r requirements.txt
 
 
 # ── Stage 2: runtime ──────────────────────────────────────────────────────────
@@ -27,6 +33,7 @@ COPY training/   ./training/
 COPY monitoring/ ./monitoring/
 COPY alerting/   ./alerting/
 COPY agent/ /app/agent/
+COPY experiments/ /app/experiments/
 
 # Artifacts dir created here; actual artifacts mounted/copied at runtime
 RUN mkdir -p artifacts/models artifacts/drift_reports artifacts/quality_reports \

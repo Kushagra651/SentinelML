@@ -8,8 +8,14 @@
 
 -- Also create the airflow database if it doesn't exist
 -- (Airflow init handles its own schema, we just need the DB)
+SELECT 'CREATE DATABASE airflow'
 WHERE NOT EXISTS (SELECT FROM pg_database WHERE datname = 'airflow')\gexec
 GRANT ALL PRIVILEGES ON DATABASE airflow TO mluser;
+
+-- MLflow tracking backend store (separate DB, never mixed with the ml schema)
+SELECT 'CREATE DATABASE mlflow'
+WHERE NOT EXISTS (SELECT FROM pg_database WHERE datname = 'mlflow')\gexec
+GRANT ALL PRIVILEGES ON DATABASE mlflow TO mluser;
 
 
 
@@ -19,6 +25,7 @@ SET search_path TO ml, public;
 
 -- ── prediction_logs ───────────────────────────────────────────────────────────
 -- One row per prediction request. features stored as JSONB for schema flexibility.
+-- NOTE: currently UNUSED. api/logger.py creates and writes public.prediction_logs (TEXT columns).
 CREATE TABLE IF NOT EXISTS ml.prediction_logs (
     id              BIGSERIAL PRIMARY KEY,
     request_id      UUID NOT NULL UNIQUE,

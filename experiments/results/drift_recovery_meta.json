@@ -1,0 +1,16 @@
+{
+  "severities": {
+    "mild": 0.1,
+    "moderate": 0.3,
+    "severe": 0.6
+  },
+  "repeats": 3,
+  "gbm_params": {
+    "n_estimators": 200,
+    "max_depth": 4,
+    "learning_rate": 0.05,
+    "subsample": 0.8,
+    "random_state": 42
+  },
+  "split": 0.2
+}

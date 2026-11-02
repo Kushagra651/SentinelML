@@ -9,9 +9,9 @@ Tools
 ─────
   get_drift_report()          → latest drift_reports/ JSON artifact
   get_quality_report()        → latest quality_reports/ JSON artifact
-  get_model_info()            → GET /model/info
-  get_metrics_snapshot()      → GET /metrics/summary
-  get_prediction_logs(hours)  → GET /logs?hours=N
+  get_model_info()            → reads artifacts/production_model.json
+  get_metrics_snapshot()      → api.metrics.get_snapshot() (in-process)
+  get_prediction_logs(hours)  → api.logger.query_logs() (in-process)
 
 All functions return plain dicts (JSON-serialisable) so LangGraph can
 pass them directly as tool results to the LLM.
@@ -42,6 +42,9 @@ log = logging.getLogger(__name__)
 _API_BASE = os.getenv("AGENT_API_BASE", "http://localhost:8000")
 _ARTIFACTS_DIR = Path(os.getenv("ARTIFACTS_DIR", "artifacts"))
 _HTTP_TIMEOUT = int(os.getenv("AGENT_HTTP_TIMEOUT", "10"))
+_MAX_LOG_ROWS = (
+    50_000  # same cap the drift DAG uses; counts above it are flagged "truncated"
+)
 
 
 # ── HTTP helper ───────────────────────────────────────────────────────────────
@@ -127,7 +130,7 @@ def get_drift_report() -> dict[str, Any]:
         "window_end": report.get("window_end"),
         "drifted_features": drifted,
         "drifted_feature_count": len(drifted),
-        "total_features_checked": summary.get("total_features", 0),
+        "total_features_checked": summary.get("total_features_checked", 0),
         "drift_rate_pct": summary.get("drift_rate_pct", 0.0),
         "critical_count": summary.get("critical_count", 0),
         "warning_count": summary.get("warning_count", 0),
@@ -234,7 +237,8 @@ def get_prediction_logs(hours: int = 6) -> dict[str, Any]:
     """
     Return a summary of recent prediction logs.
 
-    Calls GET /logs?hours={hours} on the live FastAPI service.
+    Queries api.logger.query_logs() in-process (an HTTP call back into the same
+    single-worker server deadlocks).
     Returns row count, class distribution, confidence stats, and a sample
     of recent records (up to 10) for the agent to cite.
 
@@ -254,7 +258,7 @@ def get_prediction_logs(hours: int = 6) -> dict[str, Any]:
 
         end = datetime.utcnow()
         start = end - timedelta(hours=hours)
-        df = query_logs(start, end, limit=500)
+        df = query_logs(start, end, limit=_MAX_LOG_ROWS)
         records = df.to_dict("records") if not df.empty else []
     except Exception as exc:
         return {"error": str(exc)}
@@ -281,6 +285,7 @@ def get_prediction_logs(hours: int = 6) -> dict[str, Any]:
     return {
         "hours": hours,
         "total_predictions": len(records),
+        "truncated": len(records) >= _MAX_LOG_ROWS,
         "class_distribution": class_counts,
         "class_1_rate_pct": (
             round(class_counts[1] / len(predictions) * 100, 2) if predictions else 0
@@ -301,7 +306,7 @@ def get_prediction_logs(hours: int = 6) -> dict[str, Any]:
                 "confidence": r.get("confidence"),
                 "model_version": r.get("model_version"),
             }
-            for r in records[:10]
+            for r in records[-10:][::-1]
         ],
     }
 

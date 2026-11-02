@@ -217,9 +217,7 @@ def get_logs(hours: int = 1, limit: int = 100):
 
 
 @app.post("/agent/query")
-async def agent_query(body: dict):
-    import time
-
+def agent_query(body: dict):
     question = body.get("question", "").strip()
     if not question:
         raise HTTPException(status_code=400, detail="question is required")
@@ -241,7 +239,7 @@ async def agent_query(body: dict):
         question=question,
         answer=answer,
         latency_ms=round(latency, 2),
-        model_version=model_info.get("version_tag"),
+        model_version=model_info.get("version"),
     )
 
     return {"question": question, "answer": answer, "latency_ms": round(latency, 2)}

@@ -1,0 +1,6 @@
+DATASET / TEST SIZE JUSTIFICATION (numbers measured by this script)
+- UCI Adult Income after cleaning: 45222 rows (30162 train / 15060 test = 33% test).
+- Positive rate train=0.2489, test=0.2457: imbalanced, so accuracy alone is misleading (majority baseline 0.7543); PR-AUC and ROC-AUC reported alongside.
+- Test n=15060 gives accuracy 95% CI width 0.0113 and ROC-AUC CI width 0.0089.
+- Smaller tests widen the CI: n=500 gives accuracy width 0.0591.
+- Limits: one fixed split (no CV), tabular census extract, no timestamps (so no real temporal drift), test set reused for gate decisions and reporting, synthetic drift only.

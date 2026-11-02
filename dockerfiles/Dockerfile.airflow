@@ -1,7 +1,13 @@
 FROM apache/airflow:2.9.1-python3.11
 
 USER airflow
-RUN pip install --no-cache-dir \
+
+ENV PIP_DEFAULT_TIMEOUT=300 \
+    PIP_RETRIES=10 \
+    PIP_DISABLE_PIP_VERSION_CHECK=1
+
+RUN --mount=type=cache,target=/home/airflow/.cache/pip,uid=50000 \
+    pip install \
         scikit-learn \
         pandas \
         numpy \
@@ -10,19 +16,28 @@ RUN pip install --no-cache-dir \
         pyarrow \
         fastparquet
 
+# MLflow client only. Constrained to Airflow's own pins so the build FAILS LOUDLY
+# instead of silently upgrading something Airflow depends on.
+RUN --mount=type=cache,target=/home/airflow/.cache/pip,uid=50000 \
+    pip install \
+        --constraint "https://raw.githubusercontent.com/apache/airflow/constraints-2.9.1/constraints-3.11.txt" \
+        mlflow-skinny==2.16.2
+
 USER root
 COPY api/          ${AIRFLOW_HOME}/project/api/
 COPY data/         ${AIRFLOW_HOME}/project/data/
 COPY training/     ${AIRFLOW_HOME}/project/training/
 COPY monitoring/   ${AIRFLOW_HOME}/project/monitoring/
 COPY alerting/     ${AIRFLOW_HOME}/project/alerting/
+COPY experiments/  ${AIRFLOW_HOME}/project/experiments/
 COPY airflow/dags/ ${AIRFLOW_HOME}/dags/
 
 RUN touch ${AIRFLOW_HOME}/project/api/__init__.py \
           ${AIRFLOW_HOME}/project/data/__init__.py \
           ${AIRFLOW_HOME}/project/training/__init__.py \
           ${AIRFLOW_HOME}/project/monitoring/__init__.py \
-          ${AIRFLOW_HOME}/project/alerting/__init__.py && \
+          ${AIRFLOW_HOME}/project/alerting/__init__.py \
+          ${AIRFLOW_HOME}/project/experiments/__init__.py && \
     chown -R airflow:root ${AIRFLOW_HOME}/project ${AIRFLOW_HOME}/dags
 
 USER airflow
