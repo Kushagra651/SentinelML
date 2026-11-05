@@ -130,8 +130,15 @@ def run(repeats: int) -> pd.DataFrame:
                 ("C_retrained_drifted", new_drift),
                 ("D_retrained_clean", new_clean),
             ]:
-                rows.append({"severity": sev, "intensity": intensity, "repeat": r,
-                             "stage": stage, **res})
+                rows.append(
+                    {
+                        "severity": sev,
+                        "intensity": intensity,
+                        "repeat": r,
+                        "stage": stage,
+                        **res,
+                    }
+                )
             print(
                 f"[{sev} rep{r}] old_drift acc={old_drift['accuracy']:.4f} -> "
                 f"retrained acc={new_drift['accuracy']:.4f} "
@@ -180,8 +187,15 @@ def plot(summary: pd.DataFrame, path: Path) -> None:
     for ax, m in zip(axes, METRICS):
         for i, (st, lab, c) in enumerate(zip(stages, labels, colors)):
             sub = summary[summary["stage"] == st].set_index("severity").loc[sevs]
-            ax.bar(x + (i - 1) * w, sub[m], w, yerr=sub[f"{m}_std"], label=lab,
-                   color=c, capsize=3)
+            ax.bar(
+                x + (i - 1) * w,
+                sub[m],
+                w,
+                yerr=sub[f"{m}_std"],
+                label=lab,
+                color=c,
+                capsize=3,
+            )
         lo = summary[m].min()
         ax.set_ylim(max(0, lo - 0.05), min(1.0, summary[m].max() + 0.03))
         ax.set_xticks(x)
@@ -189,7 +203,9 @@ def plot(summary: pd.DataFrame, path: Path) -> None:
         ax.set_title(m.replace("_", "-").upper())
         ax.grid(axis="y", alpha=0.3)
     axes[0].legend(loc="lower left", fontsize=8)
-    fig.suptitle("SentinelML: covariate drift degrades the old model; retraining recovers")
+    fig.suptitle(
+        "SentinelML: covariate drift degrades the old model; retraining recovers"
+    )
     fig.tight_layout()
     fig.savefig(path, dpi=150)
     plt.close(fig)
@@ -209,9 +225,15 @@ def main() -> None:
     text = write_table(summary, args.repeats, RESULTS_DIR / "drift_recovery_table.md")
     plot(summary, RESULTS_DIR / "drift_recovery.png")
     (RESULTS_DIR / "drift_recovery_meta.json").write_text(
-        json.dumps({"severities": SEVERITIES, "repeats": args.repeats,
-                    "gbm_params": DEFAULT_PARAMS, "split": VALIDATION_SPLIT},
-                   indent=2),
+        json.dumps(
+            {
+                "severities": SEVERITIES,
+                "repeats": args.repeats,
+                "gbm_params": DEFAULT_PARAMS,
+                "split": VALIDATION_SPLIT,
+            },
+            indent=2,
+        ),
         encoding="utf-8",
     )
     print("\n" + text)

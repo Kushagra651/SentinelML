@@ -49,7 +49,9 @@ os.environ.setdefault("GIT_PYTHON_REFRESH", "quiet")
 
 logger = logging.getLogger("experiments.mlflow_utils")
 
-DEFAULT_URI = "http://localhost:5000"  # host default; containers set MLFLOW_TRACKING_URI
+DEFAULT_URI = (
+    "http://localhost:5000"  # host default; containers set MLFLOW_TRACKING_URI
+)
 PREFLIGHT_TIMEOUT_S = 2.0
 _PARAM_MAX_LEN = 500
 _KEY_BAD_CHARS = re.compile(r"[^0-9A-Za-z_\-\. /]")
@@ -115,7 +117,8 @@ def setup_tracking(experiment_name: str) -> bool:
             _enabled = _server_reachable(uri)
             if not _enabled:
                 logger.warning(
-                    "MLflow unreachable at %s - tracking disabled for this process.", uri
+                    "MLflow unreachable at %s - tracking disabled for this process.",
+                    uri,
                 )
         if not _enabled:
             return False
