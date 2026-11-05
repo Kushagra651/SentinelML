@@ -1,5 +1,3 @@
-import pytest
-
 import monitoring.drift_report as d
 
 
