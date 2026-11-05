@@ -44,6 +44,10 @@ PSI_WARNING = float(os.getenv("PSI_WARNING", "0.1"))
 PSI_CRITICAL = float(os.getenv("PSI_CRITICAL", "0.2"))
 MIN_SAMPLES = int(os.getenv("DRIFT_MIN_SAMPLES", "30"))
 PSI_BINS = int(os.getenv("PSI_BINS", "10"))
+# Multiple-comparison correction across features: none | bonferroni | bh
+DRIFT_CORRECTION = os.getenv("DRIFT_CORRECTION", "none").lower()
+# Effect-size gate: a feature only counts as drifted if its PSI >= this (0 = off)
+DRIFT_MIN_PSI = float(os.getenv("DRIFT_MIN_PSI", "0"))
 
 # UCI Adult Income — 6 numerical, 8 categorical
 NUMERICAL_FEATURES = [
@@ -309,6 +313,25 @@ def _drift_predictions(
 
 
 # ── Main entry point ──────────────────────────────────────────────────────────
+def _apply_correction(results: List[FeatureDriftResult]) -> None:
+    """Re-decide `drifted` across all features (in place)."""
+    if not results or (DRIFT_CORRECTION == "none" and DRIFT_MIN_PSI <= 0):
+        return
+    m = len(results)
+    p = np.array([r.p_value for r in results])
+    alpha = KS_P_THRESHOLD
+    if DRIFT_CORRECTION == "bonferroni":
+        sig = p < alpha / m
+    elif DRIFT_CORRECTION == "bh":
+        order = np.argsort(p)
+        ok = p[order] <= alpha * np.arange(1, m + 1) / m
+        sig = np.zeros(m, dtype=bool)
+        if ok.any():
+            sig[order[: np.max(np.where(ok)[0]) + 1]] = True
+    else:
+        sig = np.array([r.drifted for r in results])
+    for r, s in zip(results, sig):
+        r.drifted = bool(s and (r.psi or 0.0) >= DRIFT_MIN_PSI)
 
 
 def compute_drift_report(
@@ -380,7 +403,7 @@ def compute_drift_report(
             pred_drift = _drift_predictions(ref_logs, cur_logs)
         except Exception as e:
             log.error("Prediction drift computation failed: %s", e)
-
+    _apply_correction(feature_results)
     drifted_features = [r.feature for r in feature_results if r.drifted]
     overall_drifted = len(drifted_features) > 0 or pred_drift.drifted
 

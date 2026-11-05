@@ -65,13 +65,23 @@ RESULTS_DIR = Path(__file__).resolve().parent / "results"
 ALPHA = 0.05
 TARGET_COL = "income"
 
-RULES = ["raw_p05", "bonferroni", "bh_fdr", "ks_and_psi_crit", "psi_warn"]
+RULES = [
+    "raw_p05",
+    "bonferroni",
+    "bh_fdr",
+    "ks_and_psi_crit",
+    "psi_warn",
+    "bonf_and_psi01",
+    "bh_and_psi01",
+]
 RULE_LABEL = {
     "raw_p05": "raw p<0.05 (current)",
     "bonferroni": "Bonferroni",
     "bh_fdr": "Benjamini-Hochberg",
     "ks_and_psi_crit": "p<0.05 AND PSI>=0.2",
     "psi_warn": "PSI>=0.1 only",
+    "bonf_and_psi01": "Bonferroni AND PSI>=0.1",
+    "bh_and_psi01": "BH AND PSI>=0.1",
 }
 
 
@@ -109,15 +119,23 @@ def decide(rep) -> dict[str, bool]:
     """Apply every decision rule to ONE drift report (same p-values for all)."""
     fr = rep.feature_results
     p = np.array([r.p_value for r in fr], dtype=float)
+    psi = np.array([(r.psi or 0.0) for r in fr], dtype=float)
     m = len(p)
-    srt = np.sort(p)
-    bh = bool(np.any(srt <= (np.arange(1, m + 1) / m) * ALPHA))
+    order = np.argsort(p)
+    ok = p[order] <= (np.arange(1, m + 1) / m) * ALPHA
+    bh_sig = np.zeros(m, dtype=bool)
+    if ok.any():
+        bh_sig[order[: np.max(np.where(ok)[0]) + 1]] = True
+    bonf_sig = p < ALPHA / m
+    gate = psi >= PSI_WARNING
     return {
         "raw_p05": bool(rep.overall_drifted),
-        "bonferroni": bool(np.any(p < ALPHA / m)),
-        "bh_fdr": bh,
+        "bonferroni": bool(bonf_sig.any()),
+        "bh_fdr": bool(bh_sig.any()),
         "ks_and_psi_crit": any(r.severity == "critical" for r in fr),
-        "psi_warn": any((r.psi or 0.0) >= PSI_WARNING for r in fr),
+        "psi_warn": bool(gate.any()),
+        "bonf_and_psi01": bool((bonf_sig & gate).any()),
+        "bh_and_psi01": bool((bh_sig & gate).any()),
     }
 
 
