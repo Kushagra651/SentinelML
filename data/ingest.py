@@ -19,6 +19,7 @@ UCI dataset source:
 from __future__ import annotations
 
 import logging
+import os
 import urllib.request
 from pathlib import Path
 
@@ -43,7 +44,7 @@ TRAIN_URL = f"{UCI_BASE_URL}/adult.data"
 TEST_URL = f"{UCI_BASE_URL}/adult.test"
 
 RAW_DIR = Path("data/raw")
-FEATURE_STORE = Path("data/feature_store")
+FEATURE_STORE = Path(os.getenv("FEATURE_STORE_DIR", "data/feature_store"))
 RAW_TRAIN_CSV = RAW_DIR / "adult_train.csv"
 RAW_TEST_CSV = RAW_DIR / "adult_test.csv"
 CLEAN_TRAIN_FILE = FEATURE_STORE / "train.parquet"

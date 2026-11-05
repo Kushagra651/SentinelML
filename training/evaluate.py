@@ -335,6 +335,7 @@ def evaluate(version_tag: str, test_data_source: Optional[str] = None) -> dict:
         json.dump(report_dict, f, indent=2, default=str)
 
     logger.info("Evaluation report saved → %s", report_path)
+
     logger.info("=" * 60)
     logger.info(
         "Evaluation COMPLETE  |  accuracy=%.4f  f1=%.4f  roc_auc=%.4f  promote=%s",

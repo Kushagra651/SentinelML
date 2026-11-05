@@ -161,9 +161,13 @@ def task_fetch_live_window(**ctx):
             "Not enough data for a reliable drift check — skipping."
         )
 
+    # query_logs returns raw features as one nested dict column; expand to flat columns
+    if "features" in df.columns:
+        feats = pd.json_normalize(df["features"].tolist()).set_index(df.index)
+        df = pd.concat([df.drop(columns=["features"]), feats], axis=1)
+
     live_path = f"{ARTIFACTS_DIR}/live_window_{ctx['ds_nodash']}.parquet"
     df.to_parquet(live_path, index=False)
-
     ti.xcom_push(key="live_path", value=live_path)
     ti.xcom_push(key="window_start", value=window_start.isoformat())
     ti.xcom_push(key="window_end", value=window_end.isoformat())
