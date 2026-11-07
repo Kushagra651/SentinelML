@@ -181,6 +181,48 @@ def task_fetch_live_window(**ctx):
     )
 
 
+def _reference_predictions(ref_df):
+    """
+    Score the reference (training) data with the production model so that
+    prediction drift compares model outputs on training data vs live traffic.
+    Returns a DataFrame with 'prediction' (0/1) and 'confidence', or None on
+    any failure (prediction drift is then skipped, the DAG still passes).
+    """
+    import pickle
+
+    try:
+        with open(Path(ARTIFACTS_DIR) / "production_model.json") as f:
+            info = json.load(f)
+
+        def _resolve(key):
+            p = Path(info[key])
+            if not p.exists():
+                p = Path(ARTIFACTS_DIR) / "models" / p.name
+            return p
+
+        with open(_resolve("model_path"), "rb") as f:
+            model = pickle.load(f)
+        with open(_resolve("pipeline_path"), "rb") as f:
+            pipeline = pickle.load(f)
+
+        raw = ref_df.drop(columns=["income"], errors="ignore")
+        if len(raw) > 10_000:
+            raw = raw.sample(10_000, random_state=42)
+
+        proba = model.predict_proba(pipeline.transform(raw))[:, 1]
+        pred = (proba >= 0.5).astype(int)
+        import pandas as pd
+
+        return pd.DataFrame(
+            {"prediction": pred, "confidence": [max(p, 1 - p) for p in proba]}
+        )
+    except Exception as e:
+        log.warning(
+            "Reference predictions unavailable (%s); skipping prediction drift.", e
+        )
+        return None
+
+
 def task_compute_drift(**ctx):
     """
     Computes feature drift between the training reference set and the live window.
@@ -214,7 +256,7 @@ def task_compute_drift(**ctx):
         model_version=version,
         window_start=w_start,
         window_end=w_end,
-        ref_logs=ref_df,
+        ref_logs=_reference_predictions(ref_df),
         cur_logs=live_df,
         save=True,
     )

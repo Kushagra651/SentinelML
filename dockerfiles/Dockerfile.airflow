@@ -8,9 +8,9 @@ ENV PIP_DEFAULT_TIMEOUT=300 \
 
 RUN --mount=type=cache,target=/home/airflow/.cache/pip,uid=50000 \
     pip install \
-        scikit-learn \
-        pandas \
-        numpy \
+        scikit-learn==1.4.2 \
+        pandas==2.2.2 \
+        numpy==1.26.4 \
         scipy \
         psycopg2-binary \
         pyarrow \
