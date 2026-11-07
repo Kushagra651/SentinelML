@@ -50,6 +50,7 @@ from data.drift_injector import DriftConfig, DriftType, inject_drift  # noqa: E4
 from data.features import NUMERIC_COLS, build_features  # noqa: E402
 from data.ingest import load_from_feature_store  # noqa: E402
 from training.train import DEFAULT_PARAMS, RANDOM_SEED, VALIDATION_SPLIT  # noqa: E402
+from experiments.mlflow_utils import log_run  # noqa: E402
 
 logging.getLogger().setLevel(logging.WARNING)
 for _name in ("data.ingest", "data.features", "training.train", "root"):
@@ -236,6 +237,31 @@ def main() -> None:
         ),
         encoding="utf-8",
     )
+    try:
+        metrics = {}
+        for _, r in summary.iterrows():
+            for m in METRICS:
+                metrics[f"{r['severity']}_{r['stage']}_{m}"] = r[m]
+        log_run(
+            experiment_name="sentinelml-task1-drift-recovery",
+            run_name=f"drift_recovery_repeats{args.repeats}",
+            params={
+                "repeats": args.repeats,
+                "severities": json.dumps(SEVERITIES),
+                "split": VALIDATION_SPLIT,
+                "random_seed": RANDOM_SEED,
+                **{f"gbm_{k}": v for k, v in DEFAULT_PARAMS.items()},
+            },
+            metrics=metrics,
+            artifacts=[
+                RESULTS_DIR / "drift_recovery.png",
+                RESULTS_DIR / "drift_recovery_table.md",
+                RESULTS_DIR / "drift_recovery_meta.json",
+            ],
+            tags={"task": "1"},
+        )
+    except Exception as exc:  # noqa: BLE001
+        print(f"MLflow logging skipped: {exc}")
     print("\n" + text)
     print(f"\nSaved to {RESULTS_DIR.resolve()}")
 
