@@ -11,6 +11,7 @@ volumes:
   prometheus_data:
   artifacts_data:
   mlflow_artifacts:
+  redis_data:
 
 # ── Common Airflow env (shared by webserver + scheduler) ──────────────────────
 x-airflow-common: &airflow-common
@@ -43,6 +44,8 @@ x-airflow-common: &airflow-common
     RETRAIN_TRIGGER_SCHEDULE: ${RETRAIN_TRIGGER_SCHEDULE:-30 */6 * * *}
     RETRAIN_COOLDOWN_HOURS: ${RETRAIN_COOLDOWN_HOURS:-12}
     MLFLOW_TRACKING_URI: ${MLFLOW_TRACKING_URI:-http://ml_mlflow:5000}
+    REDIS_HOST: ${REDIS_HOST:-ml_redis}
+    REDIS_PORT: ${REDIS_PORT:-6379}
     DRIFT_CORRECTION: ${DRIFT_CORRECTION:-none}
     DRIFT_MIN_PSI: ${DRIFT_MIN_PSI:-0}
     EVAL_MIN_ACCURACY: ${EVAL_MIN_ACCURACY:-0.76}
@@ -85,6 +88,8 @@ services:
       GROQ_API_KEY: ${GROQ_API_KEY}
       AGENT_API_BASE: http://ml_api:8000
       MLFLOW_TRACKING_URI: ${MLFLOW_TRACKING_URI:-http://ml_mlflow:5000}
+      REDIS_HOST: ${REDIS_HOST:-ml_redis}
+      REDIS_PORT: ${REDIS_PORT:-6379}
       EVAL_MIN_ACCURACY: ${EVAL_MIN_ACCURACY:-0.76}
       EVAL_MIN_F1: ${EVAL_MIN_F1:-0.68}
     volumes:
@@ -283,3 +288,19 @@ services:
       - /var/run:/var/run:ro
       - /sys:/sys:ro
       - /var/lib/docker/:/var/lib/docker:ro
+  
+ # ── Redis (Feast online store; serving never depends on it) ───────────────
+  ml_redis:
+    image: redis:7-alpine
+    container_name: ml_redis
+    restart: unless-stopped
+    command: ["redis-server", "--appendonly", "yes"]
+    volumes:
+     - redis_data:/data
+    networks:
+     - ml_net
+    healthcheck:
+     test: ["CMD", "redis-cli", "ping"]
+     interval: 10s
+     timeout: 5s
+     retries: 5

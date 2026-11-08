@@ -260,6 +260,19 @@ def _check_duplicates(df: pd.DataFrame, report: ValidationReport) -> None:
     if dup_count > 0:
         report.add_warning(f"Found {dup_count} fully-duplicate rows.")
 
+def _run_ge(df: pd.DataFrame, report: ValidationReport) -> None:
+    """Great Expectations path. Raises on any GE problem so the caller can fall back."""
+    from experiments.ge_setup import CAT, run_validation  # noqa: PLC0415
+
+    result = run_validation(df)
+    for e in result["errors"]:
+        col, check = str(e["column"]), str(e["check"])
+        detail = f"GE: {e['unexpected_count']} unexpected values"
+        if check == "expect_column_values_to_be_in_set" and col in CAT:
+            report.add_warning(f"Column '{col}': {detail} (unknown categories).")
+        else:
+            report.add_error(column=col, check=check, detail=detail)
+
 
 # ---------------------------------------------------------------------------
 # Public API
@@ -267,8 +280,8 @@ def _check_duplicates(df: pd.DataFrame, report: ValidationReport) -> None:
 
 
 def validate_dataframe(
-    df: pd.DataFrame, *, raise_on_failure: bool = False
-) -> ValidationReport:
+    df: pd.DataFrame, *, raise_on_failure: bool = False, use_ge: bool = True
+ ) -> ValidationReport:
     """
     Run all validation checks on df and return a ValidationReport.
 
@@ -287,10 +300,18 @@ def validate_dataframe(
     report = ValidationReport()
 
     _check_row_count(df, report)
-    _check_schema(df, report)
-    _check_nullability(df, report)
-    _check_numeric_bounds(df, report)
-    _check_categorical_levels(df, report)
+    ge_ok = False
+    if use_ge:
+        try:
+            _run_ge(df, report)
+            ge_ok = True
+        except Exception as exc:  # noqa: BLE001
+            logger.warning("GE unavailable (%s) - using legacy checks.", exc)
+    if not ge_ok:
+        _check_schema(df, report)
+        _check_nullability(df, report)
+        _check_numeric_bounds(df, report)
+        _check_categorical_levels(df, report)
     _check_duplicates(df, report)
 
     logger.info(report.summary())
@@ -315,7 +336,7 @@ def validate_single_record(record: dict[str, Any]) -> ValidationReport:
     original_min = MIN_BATCH_ROWS
     MIN_BATCH_ROWS = 1
     try:
-        report = validate_dataframe(df, raise_on_failure=False)
+        report = validate_dataframe(df, raise_on_failure=False, use_ge=False)
     finally:
         MIN_BATCH_ROWS = original_min
 
