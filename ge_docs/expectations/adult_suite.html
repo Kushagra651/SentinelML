@@ -1,0 +1,1701 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <title>Data documentation compiled by Great Expectations</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta charset="UTF-8">
+    <title></title>
+
+    
+    
+    <link rel="stylesheet" href="https://unpkg.com/bootstrap-table@1.19.1/dist/bootstrap-table.min.css">
+    <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/4.3.1/css/bootstrap.min.css"/>
+    <link rel="stylesheet" type="text/css" href="https://unpkg.com/bootstrap-table@1.19.0/dist/extensions/filter-control/bootstrap-table-filter-control.css">
+    <link rel="stylesheet" type="text/css" href="https://cdnjs.cloudflare.com/ajax/libs/bootstrap-datepicker/1.9.0/css/bootstrap-datepicker.min.css">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@forevolve/bootstrap-dark@1.1.0/dist/css/bootstrap-prefers-dark.css" />
+
+    <style>
+  
+
+body {
+  position: relative;
+}
+
+.container {
+  padding-top: 50px;
+}
+
+.sticky {
+  position: -webkit-sticky;
+  position: sticky;
+  top: 90px;
+  z-index: 1;
+}
+
+.ge-section {
+  clear: both;
+  margin-bottom: 30px;
+  padding-bottom: 20px;
+}
+
+.popover {
+  max-width: 100%;
+}
+
+.cooltip {
+  display: inline-block;
+  position: relative;
+  text-align: left;
+  cursor: pointer;
+}
+
+.cooltip .top {
+  min-width: 200px;
+  top: -6px;
+  left: 50%;
+  transform: translate(-50%, -100%);
+  padding: 10px 20px;
+  color: #FFFFFF;
+  background-color: #222222;
+  font-weight: normal;
+  font-size: 13px;
+  border-radius: 8px;
+  position: absolute;
+  z-index: 99999999 !important;
+  box-sizing: border-box;
+  box-shadow: 0 1px 8px rgba(0, 0, 0, 0.5);
+  display: none;
+}
+
+.cooltip:hover .top {
+  display: block;
+  z-index: 99999999 !important;
+}
+
+.cooltip .top i {
+  position: absolute;
+  top: 100%;
+  left: 50%;
+  margin-left: -12px;
+  width: 24px;
+  height: 12px;
+  overflow: hidden;
+}
+
+.cooltip .top i::after {
+  content: '';
+  position: absolute;
+  width: 12px;
+  height: 12px;
+  left: 50%;
+  transform: translate(-50%, -50%) rotate(45deg);
+  background-color: #222222;
+  box-shadow: 0 1px 8px rgba(0, 0, 0, 0.5);
+}
+
+ul {
+  padding-inline-start: 20px;
+}
+
+.show-scrollbars {
+  overflow: auto;
+}
+
+td .show-scrollbars {
+  max-height: 80vh;
+}
+
+/*.show-scrollbars ul {*/
+/*  padding-bottom: 20px*/
+/*}*/
+
+.show-scrollbars::-webkit-scrollbar {
+  -webkit-appearance: none;
+}
+
+.show-scrollbars::-webkit-scrollbar:vertical {
+  width: 11px;
+}
+
+.show-scrollbars::-webkit-scrollbar:horizontal {
+  height: 11px;
+}
+
+.show-scrollbars::-webkit-scrollbar-thumb {
+  border-radius: 8px;
+  border: 2px solid white; /* should match background, can't be transparent */
+  background-color: rgba(0, 0, 0, .5);
+}
+
+#ge-cta-footer {
+  opacity: 0.9;
+  border-left-width: 4px
+}
+
+.carousel-caption {
+    position: relative;
+    left: 0;
+    top: 0;
+}
+
+footer {
+  position: fixed;
+  border-top: 1px solid #98989861;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  height: 32px;
+  padding: 4px;
+  font-size: 14px;
+  text-align: right;
+  width: 100%;
+  background: white;
+  z-index: 100000;
+}
+footer a {
+  padding-right: 8px;
+  color: #ff6210;
+  font-weight: 600;
+}
+
+footer a:hover {
+    color: #bc490d;
+    text-decoration: underline;
+}
+
+/* some css overrides for dark mode*/
+@media (prefers-color-scheme: dark) {
+  .table {
+    color: #f1f1f1 !important;
+    background-color: #212529;
+  }
+  .table-bordered{
+    border: #f1f1f1;
+  }
+  .table-hover tbody tr:hover {
+    color: #f1f1f1;
+    background-color: rgba(255,255,255,.075);
+  }
+  .form-control:disabled,
+  .form-control[readonly]{
+    background-color: #343a40;
+    opacity: .8;
+  }
+
+  .bg-light {
+    background: inherit !important;
+  }
+
+  .code-snippet {
+    background: #CDCDCD !important;
+  }
+
+  .alert-secondary a {
+    color: #0062cc;
+  }
+
+  .alert-secondary a:focus, .alert-secondary a:hover{
+    color: #004fa5;
+  }
+
+  .navbar-brand a {
+    background: url('https://great-expectations-web-assets.s3.us-east-2.amazonaws.com/full_logo_dark.png') 0 0 no-repeat;
+    background-size: 228.75px 50px;
+    display: inline-block
+  }
+  .navbar-brand a img {
+    visibility:hidden
+  }
+  footer {
+    border-top: 1px solid #ffffff61;
+    background: black;
+    z-index: 100000;
+  }
+  footer a {
+    color: #ff6210;
+  }
+
+  footer a:hover {
+    color: #ff6210;
+  }
+}</style>
+    <style>/*index page*/
+.ge-index-page-site-name-title {}
+.ge-index-page-table-container {}
+.ge-index-page-table {}
+.ge-index-page-table-profiling-links-header {}
+.ge-index-page-table-expectations-links-header {}
+.ge-index-page-table-validations-links-header {}
+.ge-index-page-table-profiling-links-list {}
+.ge-index-page-table-profiling-links-item {}
+.ge-index-page-table-expectation-suite-link {}
+.ge-index-page-table-validation-links-list {}
+.ge-index-page-table-validation-links-item {}
+
+/*breadcrumbs*/
+.ge-breadcrumbs {}
+.ge-breadcrumbs-item {}
+
+/*navigation sidebar*/
+.ge-navigation-sidebar-container {}
+.ge-navigation-sidebar-content {}
+.ge-navigation-sidebar-title {}
+.ge-navigation-sidebar-link {}</style>
+
+    
+  
+
+<script src="https://cdn.jsdelivr.net/npm/vega@5"></script>
+<script src="https://cdn.jsdelivr.net/npm/vega-lite@5"></script>
+<script src="https://cdn.jsdelivr.net/npm/vega-embed@6"></script>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.6.0/css/all.min.css">
+
+<script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/popper.js/1.12.9/umd/popper.min.js" integrity="sha384-ApNbgh9B+Y1QKtv3Rn7W3mgPxhU9K/ScQsAP7hUibX39j7fakFPskvXusvfa0b4Q" crossorigin="anonymous"></script>
+<script src="https://stackpath.bootstrapcdn.com/bootstrap/4.3.1/js/bootstrap.min.js" integrity="sha384-JjSmVgyd0p3pXB1rRibZUAYoIIy6OrQ6VrjIEaFf/nJGzIxFDsf4x0xIM+B07jRM" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/bootstrap-table@1.19.1/dist/bootstrap-table.min.js"></script>
+<script src="https://unpkg.com/bootstrap-table@1.19.1/dist/extensions/filter-control/bootstrap-table-filter-control.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/bootstrap-datepicker/1.9.0/js/bootstrap-datepicker.min.js"></script>
+    
+  
+
+
+  
+
+<link rel="shortcut icon" href="../static/images/favicon.ico" type="image/x-icon"/>
+  </head>
+
+  <body>
+
+    
+  
+
+
+  
+
+<nav class="navbar navbar-expand-md sticky-top border-bottom" style="height: 70px">
+  <div class="mr-auto">
+    <nav class="d-flex align-items-center">
+      <div class="float-left navbar-brand m-0 h-100">
+        <a href="../index.html">
+          <img
+            class="NO-CACHE"
+            src="https://great-expectations-web-assets.s3.us-east-2.amazonaws.com/logo-long.png?d=20261108T072933.824762Z&dataContextId=e932505d-2f03-4f84-a8b1-6d3f2bfcbc4f"
+            alt="Great Expectations"
+            style="width: auto; height: 50px"
+          />
+        </a>
+      </div>
+      
+        <ol class="ge-breadcrumbs breadcrumb d-md-inline-flex bg-light ml-2 mr-0 mt-0 mb-0 pt-0 pb-0 d-none">
+            <li class="ge-breadcrumbs-item breadcrumb-item"><a href="../index.html">Home</a></li>
+            <li class="ge-breadcrumbs-item breadcrumb-item active" aria-current="page">Expectations / adult_suite</li>
+        </ol>
+      
+    </nav>
+  </div>
+</nav>
+    
+
+    <div class="container-fluid pt-4 pb-4 pl-5 pr-5">
+      <div class="row">
+        <div class="col-lg-2 col-md-2 col-sm-12 d-sm-block px-0">
+  <div class="mb-4">
+  
+    <div class="col-12 p-0">
+      <h4>Expectation Suite</h4>
+      <p class="lead">A collection of Expectations defined for batches of data.</p>
+    </div>
+  
+</div>
+  <div class="sticky">
+    
+    
+      <div class="card d-md-block d-none" style="max-height: 75vh">
+  <div class="card-header p-2">
+    <strong>Table of Contents</strong>
+  </div>
+  <div class="card-body p-0" style="overflow: auto; height: 100%">
+    <nav id="navigation" class="rounded navbar   bg-light ge-navigation-sidebar-container p-1" style="max-height: 65vh;">
+      <ul class="nav nav-pills ge-navigation-sidebar-content col-12 p-0" style="max-height: 65vh">
+        
+          
+            <li class="nav-item col-12">
+              <a class="nav-link ge-navigation-sidebar-link" href="#section-1"
+               style="white-space: normal; word-break: break-all;overflow-wrap: normal;">
+                <strong>Overview</strong>
+              </a>
+            </li>
+          
+        
+          
+            <li class="nav-item col-12">
+              <a class="nav-link ge-navigation-sidebar-link ml-1" href="#section-2"
+                 style="white-space: normal; word-break: break-all;overflow-wrap: normal;">
+                age
+              </a>
+            </li>
+          
+        
+          
+            <li class="nav-item col-12">
+              <a class="nav-link ge-navigation-sidebar-link ml-1" href="#section-3"
+                 style="white-space: normal; word-break: break-all;overflow-wrap: normal;">
+                capital_gain
+              </a>
+            </li>
+          
+        
+          
+            <li class="nav-item col-12">
+              <a class="nav-link ge-navigation-sidebar-link ml-1" href="#section-4"
+                 style="white-space: normal; word-break: break-all;overflow-wrap: normal;">
+                capital_loss
+              </a>
+            </li>
+          
+        
+          
+            <li class="nav-item col-12">
+              <a class="nav-link ge-navigation-sidebar-link ml-1" href="#section-5"
+                 style="white-space: normal; word-break: break-all;overflow-wrap: normal;">
+                education
+              </a>
+            </li>
+          
+        
+          
+            <li class="nav-item col-12">
+              <a class="nav-link ge-navigation-sidebar-link ml-1" href="#section-6"
+                 style="white-space: normal; word-break: break-all;overflow-wrap: normal;">
+                education_num
+              </a>
+            </li>
+          
+        
+          
+            <li class="nav-item col-12">
+              <a class="nav-link ge-navigation-sidebar-link ml-1" href="#section-7"
+                 style="white-space: normal; word-break: break-all;overflow-wrap: normal;">
+                fnlwgt
+              </a>
+            </li>
+          
+        
+          
+            <li class="nav-item col-12">
+              <a class="nav-link ge-navigation-sidebar-link ml-1" href="#section-8"
+                 style="white-space: normal; word-break: break-all;overflow-wrap: normal;">
+                hours_per_week
+              </a>
+            </li>
+          
+        
+          
+            <li class="nav-item col-12">
+              <a class="nav-link ge-navigation-sidebar-link ml-1" href="#section-9"
+                 style="white-space: normal; word-break: break-all;overflow-wrap: normal;">
+                income
+              </a>
+            </li>
+          
+        
+          
+            <li class="nav-item col-12">
+              <a class="nav-link ge-navigation-sidebar-link ml-1" href="#section-10"
+                 style="white-space: normal; word-break: break-all;overflow-wrap: normal;">
+                marital_status
+              </a>
+            </li>
+          
+        
+          
+            <li class="nav-item col-12">
+              <a class="nav-link ge-navigation-sidebar-link ml-1" href="#section-11"
+                 style="white-space: normal; word-break: break-all;overflow-wrap: normal;">
+                native_country
+              </a>
+            </li>
+          
+        
+          
+            <li class="nav-item col-12">
+              <a class="nav-link ge-navigation-sidebar-link ml-1" href="#section-12"
+                 style="white-space: normal; word-break: break-all;overflow-wrap: normal;">
+                occupation
+              </a>
+            </li>
+          
+        
+          
+            <li class="nav-item col-12">
+              <a class="nav-link ge-navigation-sidebar-link ml-1" href="#section-13"
+                 style="white-space: normal; word-break: break-all;overflow-wrap: normal;">
+                race
+              </a>
+            </li>
+          
+        
+          
+            <li class="nav-item col-12">
+              <a class="nav-link ge-navigation-sidebar-link ml-1" href="#section-14"
+                 style="white-space: normal; word-break: break-all;overflow-wrap: normal;">
+                relationship
+              </a>
+            </li>
+          
+        
+          
+            <li class="nav-item col-12">
+              <a class="nav-link ge-navigation-sidebar-link ml-1" href="#section-15"
+                 style="white-space: normal; word-break: break-all;overflow-wrap: normal;">
+                sex
+              </a>
+            </li>
+          
+        
+          
+            <li class="nav-item col-12">
+              <a class="nav-link ge-navigation-sidebar-link ml-1" href="#section-16"
+                 style="white-space: normal; word-break: break-all;overflow-wrap: normal;">
+                workclass
+              </a>
+            </li>
+          
+        
+      </ul>
+    </nav>
+  </div>
+</div>
+    
+  </div>
+</div>
+        <div class="col-md-10 col-lg-10 col-xs-12 pl-md-4 pr-md-3">
+        
+          <div id="section-1" class="ge-section container-fluid mb-1 pb-1 pl-sm-3 px-0">
+    <div class="row" >
+        
+
+<div id="section-1-content-block-1" class="col-12" >
+
+    <div id="section-1-content-block-1-header" class="alert alert-secondary" >
+        <div>
+          
+                <h5 class="m-0" >
+                    Overview
+                </h5>
+            
+        </div>
+      
+    </div>
+
+</div>
+        
+
+<div id="section-1-content-block-2" class="col-12 table-responsive mt-1" >
+
+    <div id="section-1-content-block-2-header" >
+        
+          
+            <div>
+              
+                <h6 class="m-0" >
+                    Info
+                </h6>
+            
+            </div>
+          
+        </div>
+
+
+
+
+<table
+  id="section-1-content-block-2-body"
+  class="table table-sm" style="margin-bottom:0.5rem !important; margin-top:0.5rem !important;" 
+  data-toggle="table"
+  
+>
+    
+    
+    
+      
+      
+      
+    
+      <thead hidden>
+        <tr>
+            
+                
+                <th
+                  
+                >
+                  
+                </th>
+            
+                
+                <th
+                  
+                >
+                  
+                </th>
+            
+        </tr>
+      </thead>
+
+    <tbody>
+      <tr>
+          <td id="section-1-content-block-2-cell-1-1" ><div class="show-scrollbars">Expectation Suite Name</div></td><td id="section-1-content-block-2-cell-1-2" ><div class="show-scrollbars">adult_suite</div></td></tr><tr>
+          <td id="section-1-content-block-2-cell-2-1" ><div class="show-scrollbars">Great Expectations Version</div></td><td id="section-1-content-block-2-cell-2-2" ><div class="show-scrollbars">1.24.1</div></td></tr></tbody>
+</table>
+
+</div>
+        
+
+<div id="section-1-content-block-3" class="col-12" >
+
+    <div id="section-1-content-block-3-header" >
+        
+          
+            <div>
+              
+                <h6 class="m-0" >
+                    Table-Level Expectations
+                </h6>
+            
+            </div>
+          
+        </div>
+
+
+<ul id="section-1-content-block-3-body" >
+    
+            
+        
+        <li >
+                <span >
+                    Must have exactly these columns (in any order): <span class="badge badge-secondary" >age</span>, <span class="badge badge-secondary" >fnlwgt</span>, <span class="badge badge-secondary" >education_num</span>, <span class="badge badge-secondary" >capital_gain</span>, <span class="badge badge-secondary" >capital_loss</span>, <span class="badge badge-secondary" >hours_per_week</span>, <span class="badge badge-secondary" >workclass</span>, <span class="badge badge-secondary" >education</span>, <span class="badge badge-secondary" >marital_status</span>, <span class="badge badge-secondary" >occupation</span>, <span class="badge badge-secondary" >relationship</span>, <span class="badge badge-secondary" >race</span>, <span class="badge badge-secondary" >sex</span>, <span class="badge badge-secondary" >native_country</span>, <span class="badge badge-secondary" >income</span>
+                </span>
+            </li>
+    
+            
+        
+        <li style="list-style-type:none;" >
+                <hr class="mt-1 mb-1" >
+                    
+                </hr>
+            </li>
+    
+</ul>
+
+</div>
+        
+
+<div id="section-1-content-block-4" class="col-12 table-responsive mt-1" >
+
+    
+
+<div id="section-1-content-block-4-body" class="table table-sm" >
+  <div id="section-1-content-block-4-header" >
+        
+          
+            <div>
+              
+                <h6 class="m-0" >
+                    Notes
+                </h6>
+            
+            </div>
+          
+        </div>
+
+  
+        <p >This Expectation suite currently contains 37 total Expectations across 15 columns.</p>
+      
+    </div>
+
+</div>
+        
+    </div>
+</div>
+        
+          <div id="section-2" class="ge-section container-fluid mb-1 pb-1 pl-sm-3 px-0">
+    <div class="row" >
+        
+
+<div id="section-2-content-block-1" class="col-12" >
+
+    <div id="section-2-content-block-1-header" class="alert alert-secondary" >
+        <div>
+          
+                <h5 class="m-0" >
+                    age
+                </h5>
+            
+        </div>
+      
+    </div>
+
+</div>
+        
+
+<div id="section-2-content-block-2" class="col-12" >
+
+    
+
+<ul id="section-2-content-block-2-body" >
+    
+            
+        
+        <li >
+                <span >
+                    values must never be null.
+                </span>
+            </li>
+    
+            
+        
+        <li style="list-style-type:none;" >
+                <hr class="mt-1 mb-1" >
+                    
+                </hr>
+            </li>
+    
+            
+        
+        <li >
+                <span >
+                    value types must belong to this set: <span class="badge badge-secondary" >int64</span> <span class="badge badge-secondary" >int32</span> <span class="badge badge-secondary" >float64</span>.
+                </span>
+            </li>
+    
+            
+        
+        <li style="list-style-type:none;" >
+                <hr class="mt-1 mb-1" >
+                    
+                </hr>
+            </li>
+    
+            
+        
+        <li >
+                <span >
+                    values must be greater than or equal to <span class="badge badge-secondary" >0.0</span> and less than or equal to <span class="badge badge-secondary" >120.0</span>.
+                </span>
+            </li>
+    
+            
+        
+        <li style="list-style-type:none;" >
+                <hr class="mt-1 mb-1" >
+                    
+                </hr>
+            </li>
+    
+</ul>
+
+</div>
+        
+    </div>
+</div>
+        
+          <div id="section-3" class="ge-section container-fluid mb-1 pb-1 pl-sm-3 px-0">
+    <div class="row" >
+        
+
+<div id="section-3-content-block-1" class="col-12" >
+
+    <div id="section-3-content-block-1-header" class="alert alert-secondary" >
+        <div>
+          
+                <h5 class="m-0" >
+                    capital_gain
+                </h5>
+            
+        </div>
+      
+    </div>
+
+</div>
+        
+
+<div id="section-3-content-block-2" class="col-12" >
+
+    
+
+<ul id="section-3-content-block-2-body" >
+    
+            
+        
+        <li >
+                <span >
+                    values must never be null.
+                </span>
+            </li>
+    
+            
+        
+        <li style="list-style-type:none;" >
+                <hr class="mt-1 mb-1" >
+                    
+                </hr>
+            </li>
+    
+            
+        
+        <li >
+                <span >
+                    value types must belong to this set: <span class="badge badge-secondary" >int64</span> <span class="badge badge-secondary" >int32</span> <span class="badge badge-secondary" >float64</span>.
+                </span>
+            </li>
+    
+            
+        
+        <li style="list-style-type:none;" >
+                <hr class="mt-1 mb-1" >
+                    
+                </hr>
+            </li>
+    
+            
+        
+        <li >
+                <span >
+                    values must be greater than or equal to <span class="badge badge-secondary" >0.0</span>.
+                </span>
+            </li>
+    
+            
+        
+        <li style="list-style-type:none;" >
+                <hr class="mt-1 mb-1" >
+                    
+                </hr>
+            </li>
+    
+</ul>
+
+</div>
+        
+    </div>
+</div>
+        
+          <div id="section-4" class="ge-section container-fluid mb-1 pb-1 pl-sm-3 px-0">
+    <div class="row" >
+        
+
+<div id="section-4-content-block-1" class="col-12" >
+
+    <div id="section-4-content-block-1-header" class="alert alert-secondary" >
+        <div>
+          
+                <h5 class="m-0" >
+                    capital_loss
+                </h5>
+            
+        </div>
+      
+    </div>
+
+</div>
+        
+
+<div id="section-4-content-block-2" class="col-12" >
+
+    
+
+<ul id="section-4-content-block-2-body" >
+    
+            
+        
+        <li >
+                <span >
+                    values must never be null.
+                </span>
+            </li>
+    
+            
+        
+        <li style="list-style-type:none;" >
+                <hr class="mt-1 mb-1" >
+                    
+                </hr>
+            </li>
+    
+            
+        
+        <li >
+                <span >
+                    value types must belong to this set: <span class="badge badge-secondary" >int64</span> <span class="badge badge-secondary" >int32</span> <span class="badge badge-secondary" >float64</span>.
+                </span>
+            </li>
+    
+            
+        
+        <li style="list-style-type:none;" >
+                <hr class="mt-1 mb-1" >
+                    
+                </hr>
+            </li>
+    
+            
+        
+        <li >
+                <span >
+                    values must be greater than or equal to <span class="badge badge-secondary" >0.0</span>.
+                </span>
+            </li>
+    
+            
+        
+        <li style="list-style-type:none;" >
+                <hr class="mt-1 mb-1" >
+                    
+                </hr>
+            </li>
+    
+</ul>
+
+</div>
+        
+    </div>
+</div>
+        
+          <div id="section-5" class="ge-section container-fluid mb-1 pb-1 pl-sm-3 px-0">
+    <div class="row" >
+        
+
+<div id="section-5-content-block-1" class="col-12" >
+
+    <div id="section-5-content-block-1-header" class="alert alert-secondary" >
+        <div>
+          
+                <h5 class="m-0" >
+                    education
+                </h5>
+            
+        </div>
+      
+    </div>
+
+</div>
+        
+
+<div id="section-5-content-block-2" class="col-12" >
+
+    
+
+<ul id="section-5-content-block-2-body" >
+    
+            
+        
+        <li >
+                <span >
+                    values must never be null.
+                </span>
+            </li>
+    
+            
+        
+        <li style="list-style-type:none;" >
+                <hr class="mt-1 mb-1" >
+                    
+                </hr>
+            </li>
+    
+            
+        
+        <li >
+                <span >
+                    values must belong to this set: <span class="badge badge-secondary" >10th</span> <span class="badge badge-secondary" >11th</span> <span class="badge badge-secondary" >12th</span> <span class="badge badge-secondary" >1st-4th</span> <span class="badge badge-secondary" >5th-6th</span> <span class="badge badge-secondary" >7th-8th</span> <span class="badge badge-secondary" >9th</span> <span class="badge badge-secondary" >Assoc-acdm</span> <span class="badge badge-secondary" >Assoc-voc</span> <span class="badge badge-secondary" >Bachelors</span> <span class="badge badge-secondary" >Doctorate</span> <span class="badge badge-secondary" >HS-grad</span> <span class="badge badge-secondary" >Masters</span> <span class="badge badge-secondary" >Preschool</span> <span class="badge badge-secondary" >Prof-school</span> <span class="badge badge-secondary" >Some-college</span>.
+                </span>
+            </li>
+    
+            
+        
+        <li style="list-style-type:none;" >
+                <hr class="mt-1 mb-1" >
+                    
+                </hr>
+            </li>
+    
+</ul>
+
+</div>
+        
+    </div>
+</div>
+        
+          <div id="section-6" class="ge-section container-fluid mb-1 pb-1 pl-sm-3 px-0">
+    <div class="row" >
+        
+
+<div id="section-6-content-block-1" class="col-12" >
+
+    <div id="section-6-content-block-1-header" class="alert alert-secondary" >
+        <div>
+          
+                <h5 class="m-0" >
+                    education_num
+                </h5>
+            
+        </div>
+      
+    </div>
+
+</div>
+        
+
+<div id="section-6-content-block-2" class="col-12" >
+
+    
+
+<ul id="section-6-content-block-2-body" >
+    
+            
+        
+        <li >
+                <span >
+                    values must never be null.
+                </span>
+            </li>
+    
+            
+        
+        <li style="list-style-type:none;" >
+                <hr class="mt-1 mb-1" >
+                    
+                </hr>
+            </li>
+    
+            
+        
+        <li >
+                <span >
+                    value types must belong to this set: <span class="badge badge-secondary" >int64</span> <span class="badge badge-secondary" >int32</span> <span class="badge badge-secondary" >float64</span>.
+                </span>
+            </li>
+    
+            
+        
+        <li style="list-style-type:none;" >
+                <hr class="mt-1 mb-1" >
+                    
+                </hr>
+            </li>
+    
+            
+        
+        <li >
+                <span >
+                    values must be greater than or equal to <span class="badge badge-secondary" >1.0</span> and less than or equal to <span class="badge badge-secondary" >16.0</span>.
+                </span>
+            </li>
+    
+            
+        
+        <li style="list-style-type:none;" >
+                <hr class="mt-1 mb-1" >
+                    
+                </hr>
+            </li>
+    
+</ul>
+
+</div>
+        
+    </div>
+</div>
+        
+          <div id="section-7" class="ge-section container-fluid mb-1 pb-1 pl-sm-3 px-0">
+    <div class="row" >
+        
+
+<div id="section-7-content-block-1" class="col-12" >
+
+    <div id="section-7-content-block-1-header" class="alert alert-secondary" >
+        <div>
+          
+                <h5 class="m-0" >
+                    fnlwgt
+                </h5>
+            
+        </div>
+      
+    </div>
+
+</div>
+        
+
+<div id="section-7-content-block-2" class="col-12" >
+
+    
+
+<ul id="section-7-content-block-2-body" >
+    
+            
+        
+        <li >
+                <span >
+                    values must never be null.
+                </span>
+            </li>
+    
+            
+        
+        <li style="list-style-type:none;" >
+                <hr class="mt-1 mb-1" >
+                    
+                </hr>
+            </li>
+    
+            
+        
+        <li >
+                <span >
+                    value types must belong to this set: <span class="badge badge-secondary" >int64</span> <span class="badge badge-secondary" >int32</span> <span class="badge badge-secondary" >float64</span>.
+                </span>
+            </li>
+    
+            
+        
+        <li style="list-style-type:none;" >
+                <hr class="mt-1 mb-1" >
+                    
+                </hr>
+            </li>
+    
+            
+        
+        <li >
+                <span >
+                    values must be greater than or equal to <span class="badge badge-secondary" >0.0</span>.
+                </span>
+            </li>
+    
+            
+        
+        <li style="list-style-type:none;" >
+                <hr class="mt-1 mb-1" >
+                    
+                </hr>
+            </li>
+    
+</ul>
+
+</div>
+        
+    </div>
+</div>
+        
+          <div id="section-8" class="ge-section container-fluid mb-1 pb-1 pl-sm-3 px-0">
+    <div class="row" >
+        
+
+<div id="section-8-content-block-1" class="col-12" >
+
+    <div id="section-8-content-block-1-header" class="alert alert-secondary" >
+        <div>
+          
+                <h5 class="m-0" >
+                    hours_per_week
+                </h5>
+            
+        </div>
+      
+    </div>
+
+</div>
+        
+
+<div id="section-8-content-block-2" class="col-12" >
+
+    
+
+<ul id="section-8-content-block-2-body" >
+    
+            
+        
+        <li >
+                <span >
+                    values must never be null.
+                </span>
+            </li>
+    
+            
+        
+        <li style="list-style-type:none;" >
+                <hr class="mt-1 mb-1" >
+                    
+                </hr>
+            </li>
+    
+            
+        
+        <li >
+                <span >
+                    value types must belong to this set: <span class="badge badge-secondary" >int64</span> <span class="badge badge-secondary" >int32</span> <span class="badge badge-secondary" >float64</span>.
+                </span>
+            </li>
+    
+            
+        
+        <li style="list-style-type:none;" >
+                <hr class="mt-1 mb-1" >
+                    
+                </hr>
+            </li>
+    
+            
+        
+        <li >
+                <span >
+                    values must be greater than or equal to <span class="badge badge-secondary" >0.0</span> and less than or equal to <span class="badge badge-secondary" >168.0</span>.
+                </span>
+            </li>
+    
+            
+        
+        <li style="list-style-type:none;" >
+                <hr class="mt-1 mb-1" >
+                    
+                </hr>
+            </li>
+    
+</ul>
+
+</div>
+        
+    </div>
+</div>
+        
+          <div id="section-9" class="ge-section container-fluid mb-1 pb-1 pl-sm-3 px-0">
+    <div class="row" >
+        
+
+<div id="section-9-content-block-1" class="col-12" >
+
+    <div id="section-9-content-block-1-header" class="alert alert-secondary" >
+        <div>
+          
+                <h5 class="m-0" >
+                    income
+                </h5>
+            
+        </div>
+      
+    </div>
+
+</div>
+        
+
+<div id="section-9-content-block-2" class="col-12" >
+
+    
+
+<ul id="section-9-content-block-2-body" >
+    
+            
+        
+        <li >
+                <span >
+                    values must never be null.
+                </span>
+            </li>
+    
+            
+        
+        <li style="list-style-type:none;" >
+                <hr class="mt-1 mb-1" >
+                    
+                </hr>
+            </li>
+    
+            
+        
+        <li >
+                <span >
+                    values must belong to this set: <span class="badge badge-secondary" >&gt;50K</span> <span class="badge badge-secondary" >&lt;=50K</span>.
+                </span>
+            </li>
+    
+            
+        
+        <li style="list-style-type:none;" >
+                <hr class="mt-1 mb-1" >
+                    
+                </hr>
+            </li>
+    
+</ul>
+
+</div>
+        
+    </div>
+</div>
+        
+          <div id="section-10" class="ge-section container-fluid mb-1 pb-1 pl-sm-3 px-0">
+    <div class="row" >
+        
+
+<div id="section-10-content-block-1" class="col-12" >
+
+    <div id="section-10-content-block-1-header" class="alert alert-secondary" >
+        <div>
+          
+                <h5 class="m-0" >
+                    marital_status
+                </h5>
+            
+        </div>
+      
+    </div>
+
+</div>
+        
+
+<div id="section-10-content-block-2" class="col-12" >
+
+    
+
+<ul id="section-10-content-block-2-body" >
+    
+            
+        
+        <li >
+                <span >
+                    values must never be null.
+                </span>
+            </li>
+    
+            
+        
+        <li style="list-style-type:none;" >
+                <hr class="mt-1 mb-1" >
+                    
+                </hr>
+            </li>
+    
+            
+        
+        <li >
+                <span >
+                    values must belong to this set: <span class="badge badge-secondary" >Divorced</span> <span class="badge badge-secondary" >Married-AF-spouse</span> <span class="badge badge-secondary" >Married-civ-spouse</span> <span class="badge badge-secondary" >Married-spouse-absent</span> <span class="badge badge-secondary" >Never-married</span> <span class="badge badge-secondary" >Separated</span> <span class="badge badge-secondary" >Widowed</span>.
+                </span>
+            </li>
+    
+            
+        
+        <li style="list-style-type:none;" >
+                <hr class="mt-1 mb-1" >
+                    
+                </hr>
+            </li>
+    
+</ul>
+
+</div>
+        
+    </div>
+</div>
+        
+          <div id="section-11" class="ge-section container-fluid mb-1 pb-1 pl-sm-3 px-0">
+    <div class="row" >
+        
+
+<div id="section-11-content-block-1" class="col-12" >
+
+    <div id="section-11-content-block-1-header" class="alert alert-secondary" >
+        <div>
+          
+                <h5 class="m-0" >
+                    native_country
+                </h5>
+            
+        </div>
+      
+    </div>
+
+</div>
+        
+
+<div id="section-11-content-block-2" class="col-12" >
+
+    
+
+<ul id="section-11-content-block-2-body" >
+    
+            
+        
+        <li >
+                <span >
+                    values must never be null.
+                </span>
+            </li>
+    
+            
+        
+        <li style="list-style-type:none;" >
+                <hr class="mt-1 mb-1" >
+                    
+                </hr>
+            </li>
+    
+            
+        
+        <li >
+                <span >
+                    values must belong to this set: <span class="badge badge-secondary" >Cambodia</span> <span class="badge badge-secondary" >Canada</span> <span class="badge badge-secondary" >China</span> <span class="badge badge-secondary" >Columbia</span> <span class="badge badge-secondary" >Cuba</span> <span class="badge badge-secondary" >Dominican-Republic</span> <span class="badge badge-secondary" >Ecuador</span> <span class="badge badge-secondary" >El-Salvador</span> <span class="badge badge-secondary" >England</span> <span class="badge badge-secondary" >France</span> <span class="badge badge-secondary" >Germany</span> <span class="badge badge-secondary" >Greece</span> <span class="badge badge-secondary" >Guatemala</span> <span class="badge badge-secondary" >Haiti</span> <span class="badge badge-secondary" >Holand-Netherlands</span> <span class="badge badge-secondary" >Honduras</span> <span class="badge badge-secondary" >Hong</span> <span class="badge badge-secondary" >Hungary</span> <span class="badge badge-secondary" >India</span> <span class="badge badge-secondary" >Iran</span> <span class="badge badge-secondary" >Ireland</span> <span class="badge badge-secondary" >Italy</span> <span class="badge badge-secondary" >Jamaica</span> <span class="badge badge-secondary" >Japan</span> <span class="badge badge-secondary" >Laos</span> <span class="badge badge-secondary" >Mexico</span> <span class="badge badge-secondary" >Nicaragua</span> <span class="badge badge-secondary" >Outlying-US(Guam-USVI-etc)</span> <span class="badge badge-secondary" >Peru</span> <span class="badge badge-secondary" >Philippines</span> <span class="badge badge-secondary" >Poland</span> <span class="badge badge-secondary" >Portugal</span> <span class="badge badge-secondary" >Puerto-Rico</span> <span class="badge badge-secondary" >Scotland</span> <span class="badge badge-secondary" >South</span> <span class="badge badge-secondary" >Taiwan</span> <span class="badge badge-secondary" >Thailand</span> <span class="badge badge-secondary" >Trinadad&amp;Tobago</span> <span class="badge badge-secondary" >United-States</span> <span class="badge badge-secondary" >Vietnam</span> <span class="badge badge-secondary" >Yugoslavia</span>.
+                </span>
+            </li>
+    
+            
+        
+        <li style="list-style-type:none;" >
+                <hr class="mt-1 mb-1" >
+                    
+                </hr>
+            </li>
+    
+</ul>
+
+</div>
+        
+    </div>
+</div>
+        
+          <div id="section-12" class="ge-section container-fluid mb-1 pb-1 pl-sm-3 px-0">
+    <div class="row" >
+        
+
+<div id="section-12-content-block-1" class="col-12" >
+
+    <div id="section-12-content-block-1-header" class="alert alert-secondary" >
+        <div>
+          
+                <h5 class="m-0" >
+                    occupation
+                </h5>
+            
+        </div>
+      
+    </div>
+
+</div>
+        
+
+<div id="section-12-content-block-2" class="col-12" >
+
+    
+
+<ul id="section-12-content-block-2-body" >
+    
+            
+        
+        <li >
+                <span >
+                    values must never be null.
+                </span>
+            </li>
+    
+            
+        
+        <li style="list-style-type:none;" >
+                <hr class="mt-1 mb-1" >
+                    
+                </hr>
+            </li>
+    
+            
+        
+        <li >
+                <span >
+                    values must belong to this set: <span class="badge badge-secondary" >Adm-clerical</span> <span class="badge badge-secondary" >Armed-Forces</span> <span class="badge badge-secondary" >Craft-repair</span> <span class="badge badge-secondary" >Exec-managerial</span> <span class="badge badge-secondary" >Farming-fishing</span> <span class="badge badge-secondary" >Handlers-cleaners</span> <span class="badge badge-secondary" >Machine-op-inspct</span> <span class="badge badge-secondary" >Other-service</span> <span class="badge badge-secondary" >Priv-house-serv</span> <span class="badge badge-secondary" >Prof-specialty</span> <span class="badge badge-secondary" >Protective-serv</span> <span class="badge badge-secondary" >Sales</span> <span class="badge badge-secondary" >Tech-support</span> <span class="badge badge-secondary" >Transport-moving</span>.
+                </span>
+            </li>
+    
+            
+        
+        <li style="list-style-type:none;" >
+                <hr class="mt-1 mb-1" >
+                    
+                </hr>
+            </li>
+    
+</ul>
+
+</div>
+        
+    </div>
+</div>
+        
+          <div id="section-13" class="ge-section container-fluid mb-1 pb-1 pl-sm-3 px-0">
+    <div class="row" >
+        
+
+<div id="section-13-content-block-1" class="col-12" >
+
+    <div id="section-13-content-block-1-header" class="alert alert-secondary" >
+        <div>
+          
+                <h5 class="m-0" >
+                    race
+                </h5>
+            
+        </div>
+      
+    </div>
+
+</div>
+        
+
+<div id="section-13-content-block-2" class="col-12" >
+
+    
+
+<ul id="section-13-content-block-2-body" >
+    
+            
+        
+        <li >
+                <span >
+                    values must never be null.
+                </span>
+            </li>
+    
+            
+        
+        <li style="list-style-type:none;" >
+                <hr class="mt-1 mb-1" >
+                    
+                </hr>
+            </li>
+    
+            
+        
+        <li >
+                <span >
+                    values must belong to this set: <span class="badge badge-secondary" >Amer-Indian-Eskimo</span> <span class="badge badge-secondary" >Asian-Pac-Islander</span> <span class="badge badge-secondary" >Black</span> <span class="badge badge-secondary" >Other</span> <span class="badge badge-secondary" >White</span>.
+                </span>
+            </li>
+    
+            
+        
+        <li style="list-style-type:none;" >
+                <hr class="mt-1 mb-1" >
+                    
+                </hr>
+            </li>
+    
+</ul>
+
+</div>
+        
+    </div>
+</div>
+        
+          <div id="section-14" class="ge-section container-fluid mb-1 pb-1 pl-sm-3 px-0">
+    <div class="row" >
+        
+
+<div id="section-14-content-block-1" class="col-12" >
+
+    <div id="section-14-content-block-1-header" class="alert alert-secondary" >
+        <div>
+          
+                <h5 class="m-0" >
+                    relationship
+                </h5>
+            
+        </div>
+      
+    </div>
+
+</div>
+        
+
+<div id="section-14-content-block-2" class="col-12" >
+
+    
+
+<ul id="section-14-content-block-2-body" >
+    
+            
+        
+        <li >
+                <span >
+                    values must never be null.
+                </span>
+            </li>
+    
+            
+        
+        <li style="list-style-type:none;" >
+                <hr class="mt-1 mb-1" >
+                    
+                </hr>
+            </li>
+    
+            
+        
+        <li >
+                <span >
+                    values must belong to this set: <span class="badge badge-secondary" >Husband</span> <span class="badge badge-secondary" >Not-in-family</span> <span class="badge badge-secondary" >Other-relative</span> <span class="badge badge-secondary" >Own-child</span> <span class="badge badge-secondary" >Unmarried</span> <span class="badge badge-secondary" >Wife</span>.
+                </span>
+            </li>
+    
+            
+        
+        <li style="list-style-type:none;" >
+                <hr class="mt-1 mb-1" >
+                    
+                </hr>
+            </li>
+    
+</ul>
+
+</div>
+        
+    </div>
+</div>
+        
+          <div id="section-15" class="ge-section container-fluid mb-1 pb-1 pl-sm-3 px-0">
+    <div class="row" >
+        
+
+<div id="section-15-content-block-1" class="col-12" >
+
+    <div id="section-15-content-block-1-header" class="alert alert-secondary" >
+        <div>
+          
+                <h5 class="m-0" >
+                    sex
+                </h5>
+            
+        </div>
+      
+    </div>
+
+</div>
+        
+
+<div id="section-15-content-block-2" class="col-12" >
+
+    
+
+<ul id="section-15-content-block-2-body" >
+    
+            
+        
+        <li >
+                <span >
+                    values must never be null.
+                </span>
+            </li>
+    
+            
+        
+        <li style="list-style-type:none;" >
+                <hr class="mt-1 mb-1" >
+                    
+                </hr>
+            </li>
+    
+            
+        
+        <li >
+                <span >
+                    values must belong to this set: <span class="badge badge-secondary" >Female</span> <span class="badge badge-secondary" >Male</span>.
+                </span>
+            </li>
+    
+            
+        
+        <li style="list-style-type:none;" >
+                <hr class="mt-1 mb-1" >
+                    
+                </hr>
+            </li>
+    
+</ul>
+
+</div>
+        
+    </div>
+</div>
+        
+          <div id="section-16" class="ge-section container-fluid mb-1 pb-1 pl-sm-3 px-0">
+    <div class="row" >
+        
+
+<div id="section-16-content-block-1" class="col-12" >
+
+    <div id="section-16-content-block-1-header" class="alert alert-secondary" >
+        <div>
+          
+                <h5 class="m-0" >
+                    workclass
+                </h5>
+            
+        </div>
+      
+    </div>
+
+</div>
+        
+
+<div id="section-16-content-block-2" class="col-12" >
+
+    
+
+<ul id="section-16-content-block-2-body" >
+    
+            
+        
+        <li >
+                <span >
+                    values must never be null.
+                </span>
+            </li>
+    
+            
+        
+        <li style="list-style-type:none;" >
+                <hr class="mt-1 mb-1" >
+                    
+                </hr>
+            </li>
+    
+            
+        
+        <li >
+                <span >
+                    values must belong to this set: <span class="badge badge-secondary" >Federal-gov</span> <span class="badge badge-secondary" >Local-gov</span> <span class="badge badge-secondary" >Private</span> <span class="badge badge-secondary" >Self-emp-inc</span> <span class="badge badge-secondary" >Self-emp-not-inc</span> <span class="badge badge-secondary" >State-gov</span> <span class="badge badge-secondary" >Without-pay</span>.
+                </span>
+            </li>
+    
+            
+        
+        <li style="list-style-type:none;" >
+                <hr class="mt-1 mb-1" >
+                    
+                </hr>
+            </li>
+    
+</ul>
+
+</div>
+        
+    </div>
+</div>
+        
+        </div>
+      </div>
+    </div>
+    
+<footer>
+  <p>Stay current on everything GX with our newsletter <a href="https://greatexpectations.io/newsletter?utm_source=datadocs&utm_medium=product&utm_campaign=newsletter&utm_content=form">Subscribe</a></p>
+</footer>
+  </body>
+</html>

@@ -260,6 +260,7 @@ def _check_duplicates(df: pd.DataFrame, report: ValidationReport) -> None:
     if dup_count > 0:
         report.add_warning(f"Found {dup_count} fully-duplicate rows.")
 
+
 def _run_ge(df: pd.DataFrame, report: ValidationReport) -> None:
     """Great Expectations path. Raises on any GE problem so the caller can fall back."""
     from experiments.ge_setup import CAT, run_validation  # noqa: PLC0415
@@ -281,7 +282,7 @@ def _run_ge(df: pd.DataFrame, report: ValidationReport) -> None:
 
 def validate_dataframe(
     df: pd.DataFrame, *, raise_on_failure: bool = False, use_ge: bool = True
- ) -> ValidationReport:
+) -> ValidationReport:
     """
     Run all validation checks on df and return a ValidationReport.
 

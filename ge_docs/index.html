@@ -1,0 +1,637 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <title>Data Docs created by Great Expectations</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta charset="UTF-8">
+    <title></title>
+
+    
+    
+    <link rel="stylesheet" href="https://unpkg.com/bootstrap-table@1.19.1/dist/bootstrap-table.min.css">
+    <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/4.3.1/css/bootstrap.min.css"/>
+
+    <link rel="stylesheet" type="text/css" href="https://unpkg.com/bootstrap-table@1.19.0/dist/extensions/filter-control/bootstrap-table-filter-control.min.css">
+    <link rel="stylesheet" type="text/css" href="https://cdnjs.cloudflare.com/ajax/libs/bootstrap-datepicker/1.9.0/css/bootstrap-datepicker.min.css">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@forevolve/bootstrap-dark@1.1.0/dist/css/bootstrap-prefers-dark.css" />
+
+    <style>
+  
+
+body {
+  position: relative;
+}
+
+.container {
+  padding-top: 50px;
+}
+
+.sticky {
+  position: -webkit-sticky;
+  position: sticky;
+  top: 90px;
+  z-index: 1;
+}
+
+.ge-section {
+  clear: both;
+  margin-bottom: 30px;
+  padding-bottom: 20px;
+}
+
+.popover {
+  max-width: 100%;
+}
+
+.cooltip {
+  display: inline-block;
+  position: relative;
+  text-align: left;
+  cursor: pointer;
+}
+
+.cooltip .top {
+  min-width: 200px;
+  top: -6px;
+  left: 50%;
+  transform: translate(-50%, -100%);
+  padding: 10px 20px;
+  color: #FFFFFF;
+  background-color: #222222;
+  font-weight: normal;
+  font-size: 13px;
+  border-radius: 8px;
+  position: absolute;
+  z-index: 99999999 !important;
+  box-sizing: border-box;
+  box-shadow: 0 1px 8px rgba(0, 0, 0, 0.5);
+  display: none;
+}
+
+.cooltip:hover .top {
+  display: block;
+  z-index: 99999999 !important;
+}
+
+.cooltip .top i {
+  position: absolute;
+  top: 100%;
+  left: 50%;
+  margin-left: -12px;
+  width: 24px;
+  height: 12px;
+  overflow: hidden;
+}
+
+.cooltip .top i::after {
+  content: '';
+  position: absolute;
+  width: 12px;
+  height: 12px;
+  left: 50%;
+  transform: translate(-50%, -50%) rotate(45deg);
+  background-color: #222222;
+  box-shadow: 0 1px 8px rgba(0, 0, 0, 0.5);
+}
+
+ul {
+  padding-inline-start: 20px;
+}
+
+.show-scrollbars {
+  overflow: auto;
+}
+
+td .show-scrollbars {
+  max-height: 80vh;
+}
+
+/*.show-scrollbars ul {*/
+/*  padding-bottom: 20px*/
+/*}*/
+
+.show-scrollbars::-webkit-scrollbar {
+  -webkit-appearance: none;
+}
+
+.show-scrollbars::-webkit-scrollbar:vertical {
+  width: 11px;
+}
+
+.show-scrollbars::-webkit-scrollbar:horizontal {
+  height: 11px;
+}
+
+.show-scrollbars::-webkit-scrollbar-thumb {
+  border-radius: 8px;
+  border: 2px solid white; /* should match background, can't be transparent */
+  background-color: rgba(0, 0, 0, .5);
+}
+
+#ge-cta-footer {
+  opacity: 0.9;
+  border-left-width: 4px
+}
+
+.carousel-caption {
+    position: relative;
+    left: 0;
+    top: 0;
+}
+
+footer {
+  position: fixed;
+  border-top: 1px solid #98989861;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  height: 32px;
+  padding: 4px;
+  font-size: 14px;
+  text-align: right;
+  width: 100%;
+  background: white;
+  z-index: 100000;
+}
+footer a {
+  padding-right: 8px;
+  color: #ff6210;
+  font-weight: 600;
+}
+
+footer a:hover {
+    color: #bc490d;
+    text-decoration: underline;
+}
+
+/* some css overrides for dark mode*/
+@media (prefers-color-scheme: dark) {
+  .table {
+    color: #f1f1f1 !important;
+    background-color: #212529;
+  }
+  .table-bordered{
+    border: #f1f1f1;
+  }
+  .table-hover tbody tr:hover {
+    color: #f1f1f1;
+    background-color: rgba(255,255,255,.075);
+  }
+  .form-control:disabled,
+  .form-control[readonly]{
+    background-color: #343a40;
+    opacity: .8;
+  }
+
+  .bg-light {
+    background: inherit !important;
+  }
+
+  .code-snippet {
+    background: #CDCDCD !important;
+  }
+
+  .alert-secondary a {
+    color: #0062cc;
+  }
+
+  .alert-secondary a:focus, .alert-secondary a:hover{
+    color: #004fa5;
+  }
+
+  .navbar-brand a {
+    background: url('https://great-expectations-web-assets.s3.us-east-2.amazonaws.com/full_logo_dark.png') 0 0 no-repeat;
+    background-size: 228.75px 50px;
+    display: inline-block
+  }
+  .navbar-brand a img {
+    visibility:hidden
+  }
+  footer {
+    border-top: 1px solid #ffffff61;
+    background: black;
+    z-index: 100000;
+  }
+  footer a {
+    color: #ff6210;
+  }
+
+  footer a:hover {
+    color: #ff6210;
+  }
+}</style>
+
+    <style>/*index page*/
+.ge-index-page-site-name-title {}
+.ge-index-page-table-container {}
+.ge-index-page-table {}
+.ge-index-page-table-profiling-links-header {}
+.ge-index-page-table-expectations-links-header {}
+.ge-index-page-table-validations-links-header {}
+.ge-index-page-table-profiling-links-list {}
+.ge-index-page-table-profiling-links-item {}
+.ge-index-page-table-expectation-suite-link {}
+.ge-index-page-table-validation-links-list {}
+.ge-index-page-table-validation-links-item {}
+
+/*breadcrumbs*/
+.ge-breadcrumbs {}
+.ge-breadcrumbs-item {}
+
+/*navigation sidebar*/
+.ge-navigation-sidebar-container {}
+.ge-navigation-sidebar-content {}
+.ge-navigation-sidebar-title {}
+.ge-navigation-sidebar-link {}</style>
+
+    
+  
+
+<script src="https://cdn.jsdelivr.net/npm/vega@5"></script>
+<script src="https://cdn.jsdelivr.net/npm/vega-lite@5"></script>
+<script src="https://cdn.jsdelivr.net/npm/vega-embed@6"></script>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.6.0/css/all.min.css">
+
+<script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/popper.js/1.12.9/umd/popper.min.js" integrity="sha384-ApNbgh9B+Y1QKtv3Rn7W3mgPxhU9K/ScQsAP7hUibX39j7fakFPskvXusvfa0b4Q" crossorigin="anonymous"></script>
+<script src="https://stackpath.bootstrapcdn.com/bootstrap/4.3.1/js/bootstrap.min.js" integrity="sha384-JjSmVgyd0p3pXB1rRibZUAYoIIy6OrQ6VrjIEaFf/nJGzIxFDsf4x0xIM+B07jRM" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/bootstrap-table@1.19.1/dist/bootstrap-table.min.js"></script>
+<script src="https://unpkg.com/bootstrap-table@1.19.1/dist/extensions/filter-control/bootstrap-table-filter-control.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/bootstrap-datepicker/1.9.0/js/bootstrap-datepicker.min.js"></script>
+    
+
+
+  
+
+<link rel="shortcut icon" href="./static/images/favicon.ico" type="image/x-icon"/>
+  </head>
+
+  <body>
+
+
+    
+
+
+  
+
+<nav class="navbar navbar-expand-md sticky-top border-bottom" style="height: 70px">
+  <div class="mr-auto">
+    <nav class="d-flex align-items-center">
+      <div class="float-left navbar-brand m-0 h-100">
+        <a href="#">
+          <img
+            class="NO-CACHE"
+            src="https://great-expectations-web-assets.s3.us-east-2.amazonaws.com/logo-long.png?d=20261108T072933.984761Z&dataContextId=e932505d-2f03-4f84-a8b1-6d3f2bfcbc4f"
+            alt="Great Expectations"
+            style="width: auto; height: 50px"
+          />
+        </a>
+      </div>
+      
+    </nav>
+  </div>
+</nav>
+    <div class="container-fluid pt-4 pb-4 pl-5 pr-5">
+      <div class="row">
+        <div class="col-lg-2 col-md-2 col-sm-12 d-sm-block px-0">
+  <div class="mb-4">
+  
+    <div class="col-12 p-0">
+      <p>
+        Data Docs autogenerated using
+        <a href="https://greatexpectations.io">Great Expectations</a>.
+      </p>
+    </div>
+  
+</div>
+  <div class="sticky">
+    
+    
+  </div>
+</div>
+        <div class="col-md-10 col-lg-10 col-xs-12 pl-md-4 pr-md-3">
+          
+            <div id="section-1" class="ge-section container-fluid mb-1 pb-1 pl-sm-3 px-0">
+    <div class="row" >
+        
+
+<div id="section-1-content-block-1" class="col-12 ge-index-page-site-name-title" >
+
+    <div id="section-1-content-block-1-header" class="alert alert-secondary" >
+        <div>
+          
+                <span >
+                    <strong >Data Docs</strong> | local_site
+                </span>
+            
+        </div>
+      
+    </div>
+
+</div>
+        
+
+<div id="section-1-content-block-2" class="col-12 ge-index-page-tabs-container" >
+
+    
+
+
+
+
+
+
+
+
+<div
+        id="section-1-content-block-2-tabs-container"
+        
+>
+  <ul class="nav nav-tabs" id=section-1-content-block-2-tabs-nav role="tablist">
+    
+      <li class="nav-item">
+        <a
+            class="nav-link active"
+            id="Validation-Results-tab"
+            data-toggle="tab"
+            href="#Validation-Results"
+            role="tab"
+            aria-selected="true"
+            aria-controls="Validation-Results">
+          Validation Results
+        </a>
+      </li>
+    
+      <li class="nav-item">
+        <a
+            class="nav-link"
+            id="Expectation-Suites-tab"
+            data-toggle="tab"
+            href="#Expectation-Suites"
+            role="tab"
+            aria-selected="false"
+            aria-controls="Expectation-Suites">
+          Expectation Suites
+        </a>
+      </li>
+    
+  </ul>
+
+  <div class="tab-content" id="section-1-content-block-2-tabs-content">
+    
+      <div
+        class="tab-pane fade show active"
+        id="Validation-Results"
+        role="tabpanel"
+        aria-labelledby="Validation-Results-tab">
+        
+
+
+
+
+
+
+  
+
+
+<div id="section-1-content-block-2-1-body-table-toolbar" class="ml-1">
+  
+    <button class="btn btn-sm btn-secondary ml-1" onclick="clearTableFilters('section-1-content-block-2-1-body-table')">Clear Filters</button>
+  
+</div>
+
+<table
+  id="section-1-content-block-2-1-body-table"
+  class="table-sm ge-index-page-validation-results-table" 
+  data-toggle="table"
+>
+</table>
+
+<script>
+  function rowStyleLinks(row, index) {
+    return {
+      css: {
+        cursor: "pointer"
+      }
+    }
+  }
+
+  function rowAttributesLinks(row, index) {
+    return {
+      "class": "clickable-row",
+      "data-href": row._table_row_link_path
+    }
+  }
+
+  function expectationSuiteNameFilterDataCollector(value, row, formattedValue) {
+    return row._expectation_suite_name_sort;
+  }
+
+  function validationSuccessFilterDataCollector(value, row, formattedValue) {
+    return row._validation_success_text;
+  }
+
+    function getFormattedDateWithoutTime  (d) {
+
+        month = '' + (d.getMonth() + 1),
+        day = '' + d.getDate(),
+        year = d.getFullYear();
+
+        if (month.length < 2)
+            month = '0' + month;
+        if (day.length < 2)
+            day = '0' + day;
+
+        return [year, month, day].join('-');
+    }
+
+  function formatRuntimeDateForFilter(text, value, field, data){
+    const cellValueAsDateObj = new Date(value);
+    return text == getFormattedDateWithoutTime(cellValueAsDateObj);
+  }
+
+  function clearTableFilters(tableId) {
+    $(`#${tableId}`).bootstrapTable('clearFilterControl');
+    $(`#${tableId}`).bootstrapTable('resetSearch');
+  }
+</script>
+
+<script>
+  $('#section-1-content-block-2-1-body-table').bootstrapTable(
+    Object.assign(
+      {
+        columns: [{'field': 'validation_success', 'title': 'Status', 'sortable': 'true', 'align': 'center', 'filterControl': 'select', 'filterDataCollector': 'validationSuccessFilterDataCollector'}, {'field': 'run_time', 'title': 'Run Time', 'sortName': '_run_time_sort', 'sortable': 'true', 'filterControl': 'datepicker', 'filterCustomSearch': 'formatRuntimeDateForFilter', 'filterDatepickerOptions': {'clearBtn': 'true', 'autoclose': 'true', 'format': 'yyyy-mm-dd', 'todayHighlight': 'true'}}, {'field': 'run_name', 'title': 'Run Name', 'sortable': 'true', 'filterControl': 'input'}, {'field': 'asset_name', 'title': 'Asset Name', 'sortable': 'true', 'filterControl': 'select'}, {'field': 'batch_identifier', 'title': 'Batch ID', 'sortName': '_batch_identifier_sort', 'sortable': 'true', 'filterControl': 'input'}, {'field': 'expectation_suite_name', 'title': 'Expectation Suite', 'sortName': '_expectation_suite_name_sort', 'sortable': 'true', 'filterControl': 'select', 'filterDataCollector': 'expectationSuiteNameFilterDataCollector'}],
+        data: [{'validation_success': '\n                <span class="ge-index-page-table-validation-links-item" >\n                    <i class="fas fa-check-circle text-success ge-success-icon" ></i>\n                </span>\n            ', 'run_time': '2026-11-08 07:29:33 UTC', '_run_time_sort': 1794122973.104139, 'run_name': '__none__', 'batch_identifier': '\n                <span class="m-0 p-0 cooltip" >\n                    pd-adult\n                    <span class=top>\n                        Batch Spec:\n\n{\n  "batch_data": "PandasDataFrame"\n}\n                    </span>\n                </span>\n            ', '_batch_identifier_sort': 'pd-adult', 'expectation_suite_name': '\n                <a class="ge-index-page-table-expectation-suite-link" href="expectations/adult_suite.html" style="word-break:break-all;" >\n                    adult_suite\n                </a>\n            ', '_expectation_suite_name_sort': 'adult_suite', '_table_row_link_path': 'validations/adult_suite/__none__/20261108T072933.104139Z/pd-adult.html', '_validation_success_text': 'Success', 'asset_name': 'adult'}],
+        toolbar: '#section-1-content-block-2-1-body-table-toolbar'
+      },
+      {'search': 'true', 'trimOnSearch': 'false', 'visibleSearch': 'true', 'rowStyle': 'rowStyleLinks', 'rowAttributes': 'rowAttributesLinks', 'sortName': 'run_time', 'sortOrder': 'desc', 'pagination': 'true', 'filterControl': 'true', 'iconSize': 'sm', 'toolbarAlign': 'right', 'showSearchClearButton': 'true'}
+    )
+  );
+
+  
+
+  
+    $(document).ready(function() {
+      $("#section-1-content-block-2-1-body-table").on('click-row.bs.table', function(e, row, $element) {
+          window.location = $element.data("href");
+        })
+      }
+    );
+  
+</script>
+      </div>
+    
+      <div
+        class="tab-pane fade"
+        id="Expectation-Suites"
+        role="tabpanel"
+        aria-labelledby="Expectation-Suites-tab">
+        
+
+
+
+
+
+
+  
+
+
+<div id="section-1-content-block-2-2-body-table-toolbar" class="ml-1">
+  
+    <button class="btn btn-sm btn-secondary ml-1" onclick="clearTableFilters('section-1-content-block-2-2-body-table')">Clear Filters</button>
+  
+</div>
+
+<table
+  id="section-1-content-block-2-2-body-table"
+  class="table-sm ge-index-page-expectation_suites-table" 
+  data-toggle="table"
+>
+</table>
+
+<script>
+  function rowStyleLinks(row, index) {
+    return {
+      css: {
+        cursor: "pointer"
+      }
+    }
+  }
+
+  function rowAttributesLinks(row, index) {
+    return {
+      "class": "clickable-row",
+      "data-href": row._table_row_link_path
+    }
+  }
+
+  function expectationSuiteNameFilterDataCollector(value, row, formattedValue) {
+    return row._expectation_suite_name_sort;
+  }
+
+  function validationSuccessFilterDataCollector(value, row, formattedValue) {
+    return row._validation_success_text;
+  }
+
+    function getFormattedDateWithoutTime  (d) {
+
+        month = '' + (d.getMonth() + 1),
+        day = '' + d.getDate(),
+        year = d.getFullYear();
+
+        if (month.length < 2)
+            month = '0' + month;
+        if (day.length < 2)
+            day = '0' + day;
+
+        return [year, month, day].join('-');
+    }
+
+  function formatRuntimeDateForFilter(text, value, field, data){
+    const cellValueAsDateObj = new Date(value);
+    return text == getFormattedDateWithoutTime(cellValueAsDateObj);
+  }
+
+  function clearTableFilters(tableId) {
+    $(`#${tableId}`).bootstrapTable('clearFilterControl');
+    $(`#${tableId}`).bootstrapTable('resetSearch');
+  }
+</script>
+
+<script>
+  $('#section-1-content-block-2-2-body-table').bootstrapTable(
+    Object.assign(
+      {
+        columns: [{'field': 'expectation_suite_name', 'title': 'Expectation Suites', 'sortable': 'true'}],
+        data: [{'expectation_suite_name': 'adult_suite', '_table_row_link_path': 'expectations/adult_suite.html'}],
+        toolbar: '#section-1-content-block-2-2-body-table-toolbar'
+      },
+      {'search': 'true', 'trimOnSearch': 'false', 'visibleSearch': 'true', 'rowStyle': 'rowStyleLinks', 'rowAttributes': 'rowAttributesLinks', 'sortName': 'expectation_suite_name', 'sortOrder': 'asc', 'pagination': 'true', 'iconSize': 'sm', 'toolbarAlign': 'right'}
+    )
+  );
+
+  
+
+  
+    $(document).ready(function() {
+      $("#section-1-content-block-2-2-body-table").on('click-row.bs.table', function(e, row, $element) {
+          window.location = $element.data("href");
+        })
+      }
+    );
+  
+</script>
+      </div>
+    
+  </div>
+</div>
+
+</div>
+        
+    </div>
+</div>
+          
+        </div>
+      </div>
+    </div>
+    
+<footer>
+  <p>Stay current on everything GX with our newsletter <a href="https://greatexpectations.io/newsletter?utm_source=datadocs&utm_medium=product&utm_campaign=newsletter&utm_content=form">Subscribe</a></p>
+</footer>
+
+    
+      <footer class="border border-info alert alert-info fixed-bottom alert-dismissible fade show m-0 rounded-0 invisible" id="ge-cta-footer" role="alert" >
+  <h5 class="alert-heading text-center">
+    
+                <span class="cooltip" >
+                    <i class="m-1 fas fa-question-circle" ></i>
+                    <span class=top>
+                        To disable this footer, set the show_how_to_buttons flag in your project's data_docs_sites config to false.
+                    </span>
+                </span>
+            
+    To continue exploring Great Expectations check out one of these tutorials...
+  </h5>
+  <div class="d-flex justify-content-center flex-sm-row flex-column">
+    
+      <a href="https://docs.greatexpectations.io/docs/guides/expectations/how_to_create_and_edit_expectations_with_instant_feedback_from_a_sample_batch_of_data" class="btn btn-primary m-2" rel="noopener noreferrer" target="_blank">How to Create Expectations</a>
+    
+      <a href="https://docs.greatexpectations.io/docs/guides/validation/checkpoints/how_to_create_a_new_checkpoint" class="btn btn-primary m-2" rel="noopener noreferrer" target="_blank">How to Validate Data</a>
+    
+      <a href="https://docs.greatexpectations.io/docs/guides/setup/configuring_data_docs/how_to_host_and_share_data_docs_on_a_filesystem" class="btn btn-primary m-2" rel="noopener noreferrer" target="_blank">How to Set Up a Team Site</a>
+    
+  </div>
+  <button type="button" class="close" data-dismiss="alert" aria-label="Close">
+    <span aria-hidden="true">&times;</span>
+  </button>
+</footer>
+<script>
+  if (sessionStorage.getItem("showCta") !== "false") {
+    $('#ge-cta-footer').removeClass("invisible")
+  }
+  $('#ge-cta-footer').on('closed.bs.alert', function () {
+    sessionStorage.setItem("showCta", false)
+  })
+</script>
+    
+  </body>
+</html>

@@ -1,0 +1,630 @@
+=====================================================================
+SENTINELML - EVERY NUMBER, EXPLAINED AND DEFENDED (SIMPLE LANGUAGE)
+=====================================================================
+Built from: your pasted result files, code, config and progress notes
+(up to 6 Nov 2026).
+
+HOW TO USE THIS FILE
+- Each number has: WHAT it is, HOW it was measured, SIMPLE DEFENSE
+  (what to say), and LIMIT (the honest weakness to admit).
+- Rule for interviews: say the number, say how you got it, say the limit.
+  Admitting the limit first makes you sound more trustworthy, not less.
+- Tags: [MEASURED] = you ran it and have the output.
+        [CODE]     = value read from code/config (a setting, not a result).
+        [COMPUTED] = simple arithmetic from measured numbers.
+        [NOT MEASURED] = never measured; do NOT claim it.
+
+THE 5 SENTENCES TO MEMORISE
+1. Severe drift cut accuracy 86.7% -> 80.0%; retraining won back ~80%.
+2. My first drift detector false-alarmed on 44% of clean windows.
+3. Bonferroni + PSI>=0.1 at window 1000 cut that to 1.5%.
+4. Model: 86.67% accuracy [86.10, 87.18], ROC-AUC 0.921, vs 75.43% for
+   always guessing "<=50K".
+5. One worker serves about 50 requests/second; latency grows because
+   requests wait in a queue.
+
+CONTENTS
+ A. The data and setup numbers
+ B. Model training settings
+ C. Task 1  - Drift -> Degradation -> Recovery
+ D. Task 2  - Drift detector evaluation
+ E. Task 3  - Model evaluation rigor
+ F. Task 4  - Load test
+ G. MLflow / tracking numbers
+ H. Pipeline and guard-rail settings (schedules, cooldown, gates)
+ I. Traffic, database and cleanup numbers
+ J. Drift DAG test numbers
+ K. Code-quality numbers (tests, CI, services)
+ L. Numbers you must NOT claim
+ M. Hard interview questions with short answers
+
+=====================================================================
+A. THE DATA AND SETUP NUMBERS
+=====================================================================
+
+A1. Dataset: UCI Adult Income  [MEASURED/CODE]
+- Raw files: adult.data 32,561 rows, adult.test 16,281 rows
+  (from the ingest.py description).
+- After dropping rows with missing values ("?"): 45,222 rows total.
+- Split: 30,162 train + 15,060 test.  [MEASURED]
+- 15,060 / 45,222 = 33% test.  [COMPUTED]
+WHAT: A public census table; goal is to predict income >50K or <=50K.
+SIMPLE DEFENSE: "I used a public benchmark so anyone can reproduce my
+numbers. It has 14 input columns: 6 numbers and 8 categories."
+LIMIT: It is a census extract with no timestamps. So I cannot test real
+changes over time, and drift had to be simulated.
+
+A2. 14 features: 6 numeric + 8 categorical  [CODE]
+Numeric: age, fnlwgt, education_num, capital_gain, capital_loss,
+hours_per_week.
+Categorical: workclass, education, marital_status, occupation,
+relationship, race, sex, native_country.
+SIMPLE DEFENSE: "The drift detector runs one test per feature, so 14
+tests per check. That number (14) is why I had a false-alarm problem."
+
+A3. Class balance  [MEASURED]
+- Train positive rate (>50K): 0.2489. Test positive rate: 0.2457.
+- So roughly 75% / 25%.
+WHAT: About 1 in 4 people earn >50K.
+SIMPLE DEFENSE: "The classes are unbalanced, so accuracy alone can fool
+you. That is why I report ROC-AUC and PR-AUC too."
+
+A4. Majority-class baseline: accuracy 0.7543  [MEASURED]
+WHAT: If a model always says "<=50K", it is right 75.43% of the time.
+SIMPLE DEFENSE: "This is the floor. My model must beat 75.43%, not 0."
+LIMIT: Accuracy 0.7543 equals 1 - 0.2457 (the test positive rate).
+
+A5. Validation split inside training: 20% (TRAIN_VAL_SPLIT=0.2), seed 42
+[CODE]. train.py holds out 20% of the training rows for a quick check.
+Do not confuse it with the 15,060-row TEST set used by evaluate.py.
+
+=====================================================================
+B. MODEL TRAINING SETTINGS
+=====================================================================
+
+B1. Model: GradientBoostingClassifier  [CODE]
+- n_estimators 200, max_depth 4, learning_rate 0.05, subsample 0.8,
+  random_state 42.
+SIMPLE DEFENSE: "Gradient boosting builds 200 small trees, each fixing
+the mistakes of the last. It handles mixed data well and trains fast."
+LIMIT: I did not run a hyperparameter search. These are sensible
+defaults, not tuned values.
+
+B2. Training time: 4.4 seconds (base model)  [MEASURED, Task 1 log]
+SIMPLE DEFENSE: "Retraining is cheap, so automatic retraining is
+realistic for this dataset."
+LIMIT: Larger data would take longer. The 12 h cooldown is about
+safety, not about training time.
+
+B3. Features pipeline: log1p on capital_gain/capital_loss, standard
+scaling on 6 numeric columns, ordinal encoding on 8 categoricals.
+[CODE]
+SIMPLE DEFENSE: "Raw features are stored; the pipeline is applied at
+serving time, so training and serving use the same code (no skew)."
+
+=====================================================================
+C. TASK 1 - DRIFT -> DEGRADATION -> RECOVERY
+=====================================================================
+Question answered: "Is drift a real problem, and does retraining fix it?"
+Setup [MEASURED]: train 30,162, test 15,060. Drift injected with
+data/drift_injector.py, type COVARIATE, intensity 0.1 / 0.3 / 0.6.
+3 different drift seeds per level. Labels not touched.
+Stages: A old model clean test; B old model drifted test;
+C retrained model drifted test; D retrained model clean test.
+
+C1. Full table (mean +- std over 3 drift seeds)
+ severity  stage                 accuracy         ROC-AUC          PR-AUC
+ mild      A_old_clean           0.8667 +- 0.0000 0.9212 +- 0.0000 0.8195 +- 0.0000
+ mild      B_old_drifted         0.8649 +- 0.0005 0.9193 +- 0.0001 0.8135 +- 0.0006
+ mild      C_retrained_drifted   0.8644 +- 0.0005 0.9190 +- 0.0001 0.8135 +- 0.0007
+ mild      D_retrained_clean     0.8659 +- 0.0004 0.9203 +- 0.0002 0.8177 +- 0.0006
+ moderate  A_old_clean           0.8667 +- 0.0000 0.9212 +- 0.0000 0.8195 +- 0.0000
+ moderate  B_old_drifted         0.8546 +- 0.0001 0.9096 +- 0.0002 0.7845 +- 0.0024
+ moderate  C_retrained_drifted   0.8584 +- 0.0001 0.9131 +- 0.0006 0.7976 +- 0.0006
+ moderate  D_retrained_clean     0.8610 +- 0.0008 0.9158 +- 0.0005 0.8076 +- 0.0010
+ severe    A_old_clean           0.8667 +- 0.0000 0.9212 +- 0.0000 0.8195 +- 0.0000
+ severe    B_old_drifted         0.7996 +- 0.0027 0.8625 +- 0.0018 0.6592 +- 0.0048
+ severe    C_retrained_drifted   0.8535 +- 0.0019 0.9077 +- 0.0000 0.7849 +- 0.0009
+ severe    D_retrained_clean     0.8493 +- 0.0013 0.9081 +- 0.0007 0.7843 +- 0.0008
+
+C2. Summary table
+ severity (intensity) | old acc, clean | old acc, drifted | retrained | lost    | recovered
+ mild (0.1)           | 0.8667         | 0.8649           | 0.8644    | -0.18pp | nothing
+ moderate (0.3)       | 0.8667         | 0.8546           | 0.8584    | -1.21pp | +0.38pp (~31%)
+ severe (0.6)         | 0.8667         | 0.7996           | 0.8535    | -6.71pp | +5.39pp (~80%)
+ PR-AUC old -> retrained: mild 0.8135->0.8135, moderate 0.7845->0.7976,
+ severe 0.6592->0.7849.
+
+NUMBER-BY-NUMBER DEFENSE
+
+C-a. "0.8667 -> 0.7996 (-6.71 pp)" [COMPUTED: 86.67 - 79.96]
+WHAT: Accuracy fell by about 6.7 percentage points under severe drift.
+SIMPLE DEFENSE: "When inputs shift a lot, the model quietly gets about
+7 points worse, and nothing crashes. That is why monitoring matters."
+LIMIT: The drift is simulated, not from real life.
+
+C-b. "PR-AUC 0.8195 -> 0.6592"
+WHAT: PR-AUC focuses on the rarer ">50K" group. It dropped by 0.16.
+SIMPLE DEFENSE: "PR-AUC fell much more than accuracy, so the minority
+class suffers most. Accuracy hides that."
+
+C-c. "Retrained: 0.8535 (+5.39 pp, ~80% recovered)" [COMPUTED: 5.39/6.71]
+SIMPLE DEFENSE: "Retraining on drifted data wins back about four fifths
+of the loss."
+LIMIT (important): In this test, retraining gets instant, correct
+labels. In production, labels come late. So 80% is an UPPER BOUND.
+
+C-d. "Mild: -0.18 pp, retraining gains nothing"
+SIMPLE DEFENSE: "Small drift is harmless. If my alert fires on small
+drift, a retrain wastes effort. This finding made me fix the detector
+(Task 2)."
+
+C-e. "Moderate: -1.21 pp, recovered 0.38 pp (~31%)" [COMPUTED]
+SIMPLE DEFENSE: "In the middle, retraining helps only a little."
+
+C-f. "Std <= 0.003"
+WHAT: Spread across the 3 drift seeds is tiny.
+LIMIT: Only the drift injection changed between runs. The train split
+and model seed were fixed, so retraining variance is not captured.
+
+C-g. "Retrained model on clean data: 0.8493 vs 0.8667"
+WHAT: After severe-drift retraining, the model is worse on normal data
+by 1.74 pp. [COMPUTED]
+SIMPLE DEFENSE: "Adapting to new data costs something on the old data.
+Retraining is not free; it is a trade."
+
+C-h. "Gap after retraining about 1.3 pp" [COMPUTED: 0.8667 - 0.8535]
+SIMPLE DEFENSE: "Even after retraining, severe drift leaves a small
+permanent loss."
+
+C-i. Drift levels 0.1 / 0.3 / 0.6 [CODE]
+WHAT: Intensity = how far (in standard deviations) numeric columns are
+shifted, and what fraction of rows is shifted.
+LIMIT: Only covariate drift (input shift). I did not test label drift
+or concept drift here.
+
+=====================================================================
+D. TASK 2 - DRIFT DETECTOR EVALUATION
+=====================================================================
+Question answered: "How do you know your drift alerts are trustworthy?"
+
+Setup [MEASURED]: reference = train split (30,162 rows). Clean windows
+sampled from the TEST split (independent). 14 features per check.
+200 windows per false-alarm cell; 50 repeats per detection cell.
+Window sizes 30, 100, 500, 1000. Drift intensities 0.0 to 0.6.
+Full run took about 11 minutes.
+
+D0. Current settings [CODE]
+KS p-threshold 0.05; chi-square p-threshold 0.05; PSI warning 0.1,
+critical 0.2; PSI bins 10; minimum samples 30.
+Old rule: overall_drifted = ANY of 14 features has p < 0.05.
+
+D1. False positive rate (alarms on CLEAN windows)
+ window | raw p<0.05 (old) | Bonferroni | BH    | p<0.05 AND PSI>=0.2 | PSI>=0.1 only
+ 30     | 0.540            | 0.280      | 0.280 | 0.520               | 1.000
+ 100    | 0.620            | 0.205      | 0.210 | 0.355               | 1.000
+ 500    | 0.480            | 0.115      | 0.115 | 0.105               | 1.000
+ 1000   | 0.440            | 0.065      | 0.070 | 0.010               | 0.870
+
+D2. Theory check
+1 - 0.95^14 = 0.512  [COMPUTED]
+SIMPLE DEFENSE: "If I run 14 tests at 5% each, the chance at least one
+fires by luck is about 51%. My measured 44-62% matches that. So the old
+rule was not 'broken code'; it was a statistics problem called multiple
+comparisons."
+LIMIT: Features are not perfectly independent, so theory is approximate.
+
+D3. Windows sampled from the reference itself (biased check)
+Raw rule: 0.52 / 0.515 / 0.415 / 0.385 for W = 30/100/500/1000.
+WHAT: When the clean window comes from the same data the reference was
+built from, there is slight bias at W=1000 (0.385 vs 0.44).
+LIMIT: With 200 windows, the error bar is about +-0.07, so at W=30 and
+W=100 the difference is just noise.
+
+D4. Detection rate by drift size (key rows)
+ window | rule                 | 0.0 (FPR) | 0.1  | 0.2  | 0.3  | 0.45 | 0.6
+ 100    | Bonferroni           | 0.24      | 0.24 | 0.90 | 1.00 | 1.00 | 1.00
+ 500    | Bonferroni           | 0.08      | 0.80 | 1.00 | 1.00 | 1.00 | 1.00
+ 1000   | Bonferroni           | 0.06      | 1.00 | 1.00 | 1.00 | 1.00 | 1.00
+ 1000   | raw p<0.05           | 0.42      | 1.00 | 1.00 | 1.00 | 1.00 | 1.00
+ 1000   | p<0.05 AND PSI>=0.2  | 0.02      | 0.02 | 0.02 | 0.02 | 1.00 | 1.00
+ 500    | p<0.05 AND PSI>=0.2  | 0.10      | 0.10 | 0.10 | 0.12 | 1.00 | 1.00
+(Note: FPR here is 0.06/0.08/0.42 vs D1's 0.065/0.115/0.44. Different
+random batches of windows, 50 vs 200 repeats. Quote D1 for FPR.)
+
+D5. Final recommended rule: Bonferroni AND PSI>=0.1 (per feature)
+ window | FPR (clean) | detect 0.1 | detect 0.2 | detect 0.3
+ 1000   | 0.015       | 0.00       | 0.00       | 1.00
+ 500    | 0.050       | 0.02       | 0.02       | 1.00
+ 100    | 0.140       | 0.24       | 0.26       | 0.44
+ 30     | 0.280       | 0.44       | 0.44       | 0.48
+SIMPLE DEFENSE: "At 1000 samples this rule almost never false-alarms
+(1.5%), ignores harmless drift (0% at intensity 0.1 and 0.2), and always
+catches the moderate drift that costs 1.2 points of accuracy (100% at
+0.3)."
+LIMIT: The harmless/moderate line (between 0.2 and 0.3) is measured on
+synthetic covariate drift only. Below 100 samples the rule is unusable.
+
+D6. Why Bonferroni
+Bonferroni divides 0.05 by the number of tests (14), so each feature
+needs p < about 0.0036. BH (Benjamini-Hochberg) is a softer version.
+They gave nearly equal results (0.065 vs 0.070 at W=1000).
+SIMPLE DEFENSE: "If you buy 14 lottery tickets, you make each ticket
+harder to win so the total stays at 5%."
+
+D7. Why add PSI>=0.1 on top
+Significance (p-value) says "the change is real". PSI says "the change
+is big". With many samples, tiny harmless shifts become 'significant'.
+At W>=500 even intensity 0.1 (harmless, -0.18 pp) was detected 80-100%
+of the time with p-values alone.
+SIMPLE DEFENSE: "I need both: real AND big enough to matter."
+Note: PSI>=0.1 alone fires on 87-100% of clean windows, but combined
+per feature with Bonferroni it works. (Cause of the PSI-alone problem is
+a hypothesis, not verified.)
+
+D8. The old 'critical' rule has a cliff
+p<0.05 AND PSI>=0.2 at W=1000: detect 0.3 is only 0.02, then 1.00 at
+0.45. SIMPLE DEFENSE: "It would have missed the moderate drift that
+costs 1.2 points. That is why I picked PSI>=0.1 instead of 0.2."
+
+D9. Detection delay (median samples until the rule fires)
+- Raw rule: 30-40 samples at every intensity.
+- Bonferroni/BH: 300 samples at intensity 0.1; 30-50 at 0.2 and above.
+- Combined rule at intensity 0.3: about 100 samples.
+- Old critical rule: detected only 85% of intensity-0.1 runs and 95% at
+  0.2 (delay table).
+SIMPLE DEFENSE: "My new rule reacts in about 100 samples instead of 30.
+That is the price of fewer false alarms."
+
+D10. Traffic needed for each window in a 6 h check [COMPUTED]
+ 30 samples  -> 5 requests/hour
+ 100         -> 16.7 per hour
+ 500         -> 83.3 per hour
+ 1000        -> 166.7 per hour
+SIMPLE DEFENSE: "To use window 1000 with a 6 hour check, I need about
+167 requests per hour."
+LIMIT: Real traffic is zero (section I). So the 6 h interval is NOT
+justified by data. Honest claim: window and interval are configurable,
+and I know the minimum traffic needed. Detector flags stay OFF.
+
+D11. Worst-case time from drift start to retrain start
+6 h (next drift check) + 0.5 h (retrain trigger offset) = 6.5 h
+[CODE/COMPUTED], plus training time (~5 s for this model, plus DAG
+overhead).
+
+D12. Features that false-alarm most on clean windows
+native_country 21.5% at W=30; marital_status and occupation also high.
+LIMIT: Hypothesis only: chi-square is unreliable when many categories
+are rare (expected counts near 0). Not verified.
+
+D13. Pick of window
+Script printed "window=500" only because it sorts by smaller window.
+W=500 FPR is exactly 0.05 (upper error bar about 0.09). So W=1000 is the
+safer pick.
+
+D14. Unit tests for the detector change: 5 tests passed (none,
+Bonferroni, BH, PSI gate, empty list). Flags: DRIFT_CORRECTION,
+DRIFT_MIN_PSI, DRIFT_MIN_SAMPLES; all default OFF (none, 0, 30).
+
+=====================================================================
+E. TASK 3 - MODEL EVALUATION RIGOR
+=====================================================================
+Question answered: "Is your model actually good, and are your promotion
+gates meaningful?"
+Setup [MEASURED]: test n = 15,060; 1000 bootstrap resamples.
+
+E1. Main results with 95% confidence intervals (GBM)
+ accuracy 0.8667 [0.8610, 0.8718]
+ F1       0.6992 [0.6865, 0.7110]
+ ROC-AUC  0.9212 [0.9164, 0.9257]
+ PR-AUC   0.8195 [0.8094, 0.8291]
+ Brier    0.0930
+SIMPLE DEFENSE for a confidence interval: "I re-sampled the test set
+1000 times. 95% of the time the true accuracy lands between 86.10% and
+87.18%. So I say 86.7%, give or take about 0.6."
+LIMIT: Bootstrap measures test-set noise only, not noise from training.
+
+E2. Model comparison
+ model          accuracy  F1      ROC-AUC  PR-AUC  Brier
+ GBM            0.8667    0.6992  0.9212   0.8195  0.0930
+ LR one-hot     0.8418    0.6475  0.8968   0.7407  0.1089
+ LR ordinal     0.8135    0.5442  0.8416   0.6508  0.1301
+ Majority/prior 0.7543    0.0000  0.5000   0.2457  0.1853
+SIMPLE DEFENSE: "I compared against a dumb model and a simple model.
+Gradient boosting beats both, so the complexity pays for itself."
+LIMIT: LR ordinal is an unfair baseline (ordinal codes imply a fake
+order). Use LR one-hot as the fair baseline.
+
+E3. Paired bootstrap, GBM minus LR one-hot
+ accuracy +2.48 pp [2.09, 2.88]; ROC-AUC +0.0243 [0.0219, 0.0267];
+ PR-AUC +0.0788. All intervals exclude 0.
+SIMPLE DEFENSE: "'Paired' means both models are tested on the same
+resamples. The gap is real, not luck."
+
+E4. Calibration
+Brier 0.0930 vs 0.1853 for prior-only; Brier skill 0.498 [COMPUTED:
+1 - 0.0930/0.1853]; weighted ECE 0.0080.
+SIMPLE DEFENSE: "When the model says 70%, it is right about 70% of the
+time. ECE of 0.008 means the average gap is under 1 percentage point."
+LIMIT: ECE depends on the number of bins (10 used in evaluate.py).
+
+E5. Per-group results (threshold 0.5)
+ group               n       pos rate  selection  accuracy  TPR    FPR
+ Female              4,913   0.113     0.081      0.935     0.569  0.019
+ Male                10,147  0.310     0.254      0.834     0.642  0.080
+ White               12,970  0.260     0.210      0.860     0.634  0.061
+ Black               1,411   0.119     0.084      0.926     0.542  0.023
+ Asian-Pac-Islander  408     0.297     0.270      0.841     0.686  0.094
+ Amer-Indian-Eskimo  149     0.128     0.081      0.940     0.579  0.008
+ Other               122     0.197     0.115      0.902     0.542  0.010
+Gaps (groups with n>=100): sex TPR gap 0.073; sex selection ratio
+(min/max) 0.319; race TPR gap 0.144; race selection ratio 0.299.
+SIMPLE DEFENSE: "Women get fewer positive predictions (8.1% vs 25.4%).
+Part of that is because the real rate differs (11.3% vs 31.0%). But sex
+and race are inputs to my model, which I flag as a risk."
+LIMIT: Small groups (149 and 122 rows) have error bars up to about
++-6 pp. Higher accuracy for Female/Black is partly because the
+base rate is low (easy to be right by saying 'no').
+
+E6. Promotion gates vs noise
+ gate      old threshold  GBM point  CI lower  Majority passes old?
+ accuracy  >= 0.75        0.8667     0.8610    YES (0.7543)
+ F1        >= 0.70        0.6992     0.6865    no
+ ROC-AUC   >= 0.75        0.9212     0.9164    no
+Finding 1: old accuracy gate (0.75) was below the majority baseline
+(0.7543), so a model that always says "<=50K" would pass.
+Finding 2: F1 gate 0.70 sat inside the CI of my own recipe; a fresh
+retrain scored F1 0.6993 and failed by 0.0007.
+Fix (committed 82b1cc0): accuracy 0.76, F1 0.68, ROC-AUC 0.75.
+SIMPLE DEFENSE: "I tested my own gates against noise and found two
+weak ones. I moved accuracy above the dumb baseline and F1 just under
+the lower error bar (0.6865)."
+LIMIT: A lower F1 bar accepts slightly weaker models. The ROC-AUC delta
+gate still blocks models worse than production.
+
+E7. Delta gate (0.001 ROC-AUC) vs seed noise
+8 models differing only by random_state:
+ AUC range 0.92112 to 0.92201 (spread 0.00088)
+ seed SD 0.00035
+ SD of pairwise difference 0.00050
+ paired test-set noise SD 0.00021
+ 0.001 / 0.00035 = about 2.9x seed SD [COMPUTED]
+False promotion rate over 56 ordered pairs:
+ current gate (delta>=0.001): 0.0%
+ bootstrap CI>0 alone: 21.4%
+ bootstrap CI>0 AND delta>=0.001: 0.0%
+SIMPLE DEFENSE: "A new model must beat production by 0.001 AUC. Random
+seeds alone move AUC by only 0.00035, so a lucky seed rarely passes."
+LIMIT: The seed range (0.00088) is just under 0.001. With more seeds a
+false promotion is possible. Real retrains also change data, not only
+seed. Both models are scored on the same test set the gate reuses.
+Correction to remember: I first guessed 0.001 was inside noise; it was
+not.
+
+E8. Confidence-interval width vs test size
+ n_test  acc CI width  AUC CI width  analytic acc width
+ 500     0.0591        0.0468        0.0596
+ 1,000   0.0420        0.0363        0.0421
+ 5,000   0.0179        0.0153        0.0188
+ 15,060  0.0113        0.0089        0.0109
+Width shrinks about 1/sqrt(n). For +-0.5 pp you need about 17,756 rows.
+Current 15,060 gives about +-0.56 pp.
+SIMPLE DEFENSE: "Four times more data halves the uncertainty. My
+test size is big enough for claims down to about +-0.6 pp, and I do not
+claim anything finer."
+
+E9. Why 33% test is fine
+Larger test = narrower CI; smaller train = weaker model. 15,060 test
+rows give +-0.56 pp, which is tight enough for decisions in this
+project. LIMIT: one fixed split, no cross-validation.
+
+E10. Registry vs evaluation numbers
+production_model.json stores "val_accuracy" 0.8641 for production
+model v20260809_080617. But register_model.py fills that field with the
+TEST accuracy from the evaluation report. Fresh retrain on the same
+test set: 0.8667 (different run). Latest retrain (20261105_091036):
+accuracy 0.8667, F1 0.6993, ROC-AUC 0.9212, promote=False under old
+gates; promote=True after new gates (nothing was registered;
+production is still v20260809_080617).
+SIMPLE DEFENSE: "0.8641 is the older production model's test accuracy.
+0.8667 is a fresh retrain. Always say which version and which split."
+Also: bugs log lists roc_auc 0.9212 for the production model.
+
+E11. Why ROC-AUC for promotion (register_model.py)
+It does not depend on a cut-off and handles the 75/25 split. Accuracy
+would reward the majority-class guess.
+
+=====================================================================
+F. TASK 4 - LOAD TEST
+=====================================================================
+Question answered: "What are your real latency and throughput, and
+where is the bottleneck?"
+Setup [MEASURED]: POST /predict, closed loop, no think time, 30 s per
+level, Python standard library (no Locust), one uvicorn worker.
+
+F1. Full results
+ users  requests  error %  req/s  p50 ms   p95 ms   p99 ms   max ms
+ 10     1,464     0.0      48.6   201.5    298.5    342.8    514.3
+ 50     1,579     0.0      51.6   958.7    1131.5   1259.3   1467.1
+ 100    1,490     0.0      47.2   2149.0   2485.4   2648.4   2829.2
+Quick run (10 users, 10 s): 33.2 req/s, p50 220.9, p95 329.1,
+p99 3,362 ms (one cold-start outlier, max 3,424 ms), 0 errors.
+
+F2. How to read p50 / p95 / p99
+p50 = typical request (half are faster). p95 = 1 in 20 is slower than
+this. p99 = 1 in 100 is slower.
+SIMPLE DEFENSE: "At 10 users, 95% of requests finish in under 298 ms."
+
+F3. Throughput flat at about 47-52 req/s while latency grows
+SIMPLE DEFENSE: "More users did not add throughput. They just
+waited in line. That means one single bottleneck: one uvicorn worker."
+
+F4. Little's law check [COMPUTED]
+users / throughput = latency:
+ 10 / 48.6 = 206 ms (measured p50 201.5)
+ 50 / 51.6 = 969 ms (measured p50 958.7)
+ 100 / 47.2 = 2,119 ms (measured p50 2,149)
+SIMPLE DEFENSE: "The numbers match the queue formula, so the slow
+latency is waiting time, not slow math."
+
+F5. Service time about 20 ms per request [COMPUTED: 1000 ms / ~50 req/s]
+SIMPLE DEFENSE: "One prediction takes about 20 ms of work."
+
+F6. 0% errors up to 100 in-flight requests
+LIMIT: "100 users" means 100 requests in flight with no pause, which is
+harsher than 100 real people. Client and server share one Windows
+machine (Docker Desktop on WSL2), so the client steals CPU. Every
+request also writes a log row (async).
+
+F7. Scaling path (not tested): more uvicorn workers or replicas, then
+re-run. Do not claim any number for it.
+
+F8. Side effect: load-test rows pollute the prediction table and the
+drift window. They were deleted (section I).
+
+=====================================================================
+G. MLFLOW / TRACKING NUMBERS
+=====================================================================
+G1. Services: 10 containers after adding ml_mlflow (originally 9).
+G2. MLflow version pin: server mlflow==2.16.2; clients
+    mlflow-skinny==2.16.2 (must match). SQLAlchemy 2.0.30 and
+    alembic<1.14 in the MLflow image (Airflow needs SQLAlchemy <2.0, so
+    MLflow runs in its own container).
+G3. Port 5000; /health returned 200.
+G4. Per training: exactly 1 train run + 1 eval run, each tagged with
+    version_tag (e.g. train_v20261105_091500 and eval_v20261105_091500).
+SIMPLE DEFENSE: "Each MLflow run maps one-to-one to a registry entry
+through version_tag. MLflow records history; the JSON file decides what
+is served."
+G5. Fail-safe proof: with ml_mlflow stopped, the call printed a warning
+    and did not crash. 1 pytest passed for this. Preflight timeout 2 s.
+G6. What MLflow tracks that the JSON registry did not: params,
+    hyperparameters, train duration, n_train/n_val, all eval metrics,
+    eval report file, run history for experiments (Tasks 2-4).
+G7. Experiments seen: smoke (2), task2_detector_eval (3),
+    task3_model_eval (4), task4_load_test (5), training (6).
+LIMIT: Two stores linked only by a tag. Task 1 logging to MLflow was
+added (commit pending/push step); verify it shows in the UI.
+
+=====================================================================
+H. PIPELINE AND GUARD-RAIL SETTINGS  [CODE]
+=====================================================================
+H1. Training DAG: weekly, Sunday 02:00 UTC (0 2 * * 0).
+H2. Drift check: every 6 hours (0 */6 * * *), window 6 h, minimum
+    30 rows (can be raised to 1000 via flag).
+H3. Retrain trigger: 30 min after drift check (30 */6 * * *).
+    (Old docs said 15 min; the code says 30. Use 30.)
+H4. Cooldown 12 hours between automatic retrains. Maximum 2 per day.
+SIMPLE DEFENSE: "Because the old detector false-alarmed about half the
+time, cooldown and daily cap limit the damage: at most 2 retrains a day
+even if alarms keep firing."
+H5. Promotion gates (now): accuracy >= 0.76, F1 >= 0.68,
+    ROC-AUC >= 0.75, plus new ROC-AUC must beat production by >= 0.001.
+H6. Decision threshold 0.5.
+H7. Grafana alert rules: 11 (e.g. API error rate >5%, p99 >2000 ms,
+    mean confidence <0.55, missing rate >15%, report age >12 h).
+H8. Prometheus retention 15 days. Metric prefixes ml_api_ and
+    ml_monitor_.
+H9. Ports: API 8000, exporter 9100, Prometheus 9090, Grafana 3000,
+    Airflow 8080, cAdvisor 8081, node exporter 9101, Postgres 5432,
+    MLflow 5000, Streamlit 8501.
+H10. Agent: Groq llama-3.1-8b-instant, 5 read-only tools, temperature
+    0.1, max tokens 1024. NOT evaluated (Task 5 skipped); Groq key
+    returns 401 right now.
+
+=====================================================================
+I. TRAFFIC, DATABASE AND CLEANUP NUMBERS
+=====================================================================
+I1. Real traffic: 409 rows in public.prediction_logs, in three bursts
+    of 222, 21 (9 Aug) and 166 (14 Aug). All manual testing.
+    No organic traffic. [MEASURED]
+SIMPLE DEFENSE: "I have no real users, so I do not claim real-world
+traffic numbers. I know how much traffic I would need (167/hour)."
+I2. 374 successful /predict calls were sent and 804 rows were found
+    (older rows included). Logging works; it writes to public schema.
+I3. Cleanup: 395 rows deleted after quick test; about 4,500 after the
+    full load test; later 5,050 load-test and fake rows deleted in
+    total during the DAG test cleanup.
+I4. ml.prediction_logs (from init_db.sql) has 0 rows; api/logger.py
+    writes public.prediction_logs. Documented, not changed.
+
+=====================================================================
+J. DRIFT DAG TEST NUMBERS
+=====================================================================
+J1. ml_drift_check: all 5 tasks pass end to end.
+J2. Test with 60 identical /predict rows: 11 of 14 features flagged
+    as drifted. EXPECTED: identical rows differ heavily from the full
+    reference distribution.
+J3. Feature store: 30,162 train / 15,060 test parquet rows visible
+    from both ml_api and Airflow containers.
+J4. Prediction drift: fixed by scoring up to 10,000 reference rows with
+    the production model (threshold 0.5). It is an estimate, and the
+    check fails open (skips with a warning).
+J5. Issue open: Airflow image has sklearn 1.9.1 while ml_api uses
+    1.4.2, so pickles fail in Airflow; fix is to pin scikit-learn==1.4.2,
+    numpy==1.26.4, pandas==2.2.2 in Dockerfile.airflow.
+
+=====================================================================
+K. CODE-QUALITY NUMBERS
+=====================================================================
+K1. Tests: 13 pytest passed; black clean on 42 files; ruff clean.
+K2. CI coverage floor: --cov-fail-under=10. SIMPLE DEFENSE: "It is a
+    low floor, a smoke alarm, not a quality claim. Do not quote
+    coverage as high."
+K3. Commits not yet pushed: 9+ (push so CI runs).
+K4. CI jobs: lint, type-check, tests, build API, build Airflow, push.
+
+=====================================================================
+L. NUMBERS YOU MUST NOT CLAIM
+=====================================================================
+- Any real production traffic, users or uptime. [NOT MEASURED]
+- Agent accuracy, groundedness or latency (Task 5 skipped).
+- Any scaling number for multiple workers.
+- Any "target" latency in the old README (replace with F1 numbers).
+- Real-world drift recovery (labels arrive late; 80% is an upper bound).
+- Fairness conclusions beyond what is shown; sex/race are inputs.
+- "No requests library": mlflow-skinny installs it. Say "no requests in
+  project code".
+- Cross-validation results (none exist).
+
+=====================================================================
+M. HARD QUESTIONS, SHORT ANSWERS
+=====================================================================
+Q: Why did you build this?
+A: Models degrade silently when inputs shift and labels arrive late. I
+built a watcher plus guard-railed retraining, then measured whether it
+was worth it: severe drift costs 6.7 points, retraining wins back ~80%.
+
+Q: Why those metrics?
+A: ROC-AUC for promotion (no cut-off, handles 75/25 split), PR-AUC for
+the rare class, accuracy against the 75.43% baseline, Brier/ECE for
+calibration. Not accuracy alone.
+
+Q: Is 86.67% good?
+A: It beats always guessing (75.43%) and a fair logistic regression
+(84.18%), with a paired CI that excludes zero.
+
+Q: What went wrong and what did you fix?
+A: My detector false-alarmed on 44% of clean windows (14 tests at 5%).
+Fixed with Bonferroni + PSI>=0.1: 1.5%. My accuracy gate sat below the
+dumb baseline; raised to 0.76.
+
+Q: Is your detector deployed?
+A: Code is in, flags are OFF, because it needs about 167 requests/hour
+and I have no real traffic. I will not pretend otherwise.
+
+Q: What are the biggest weaknesses?
+A: Synthetic drift, one dataset, one fixed split, test set reused for
+gates, no real traffic, single worker, agent not evaluated.
+
+Q: Why not MLflow Model Registry?
+A: Two sources of truth. The API hot-reloads from one JSON file; MLflow
+only records history, linked by version_tag.
+
+Q: Where is the bottleneck?
+A: One uvicorn worker: ~50 req/s, ~20 ms of work per request; the rest
+is queueing.
+
+=====================================================================
+END
+=====================================================================
